@@ -49,18 +49,18 @@ export function SiteHeader() {
         </nav>
 
         <div className="hidden items-center gap-3 md:flex">
-          <button
-            type="button"
+          <Link
+            href="/signin"
             className="inline-flex items-center justify-center rounded-full border border-black/10 bg-white px-4 py-2.5 text-sm font-medium text-black transition-colors hover:border-black/20 hover:bg-[#f7f3ff]"
           >
             Sign In
-          </button>
-          <button
-            type="button"
+          </Link>
+          <Link
+            href="/signup"
             className="inline-flex items-center justify-center rounded-full bg-black px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#1b1b1b]"
           >
             Get Started
-          </button>
+          </Link>
         </div>
 
         <button
@@ -106,18 +106,18 @@ export function SiteHeader() {
             ))}
 
             <div className="mt-2 grid gap-2">
-              <button
-                type="button"
+              <Link
+                href="/signin"
                 className="inline-flex min-h-11 items-center justify-center rounded-full border border-black/10 bg-white px-4 text-sm font-medium text-black transition-colors hover:border-black/20 hover:bg-[#f7f3ff]"
               >
                 Sign In
-              </button>
-              <button
-                type="button"
+              </Link>
+              <Link
+                href="/signup"
                 className="inline-flex min-h-11 items-center justify-center rounded-full bg-black px-4 text-sm font-medium text-white transition-colors hover:bg-[#1b1b1b]"
               >
                 Get Started
-              </button>
+              </Link>
             </div>
           </nav>
         </div>

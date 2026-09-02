@@ -1,4 +1,5 @@
 import Image from 'next/image';
+import Link from 'next/link';
 
 const collageImages = [
   { src: '/images/journey-profile.png', alt: 'Lifestyle creator at her laptop', className: 'left-[34%] top-0 h-[43%] w-[35%]' },
@@ -37,7 +38,7 @@ export function CreatorFinalCta() {
             <span className="mt-5 block h-0.5 w-14 bg-[#6b30ee]" />
             <h2 className="mt-8 font-serif text-[clamp(3.2rem,5.2vw,5.8rem)] leading-[0.9] tracking-[-0.065em] text-black">Your next opportunity could <span className="text-[#7440f4]">start here.</span></h2>
             <p className="mt-8 max-w-[560px] text-lg leading-8 tracking-[-0.025em] text-[#505a70] sm:text-xl sm:leading-9">Create your CloutCo creator profile and put yourself in front of brands looking for creators like you.</p>
-            <a href="#join" className="mt-10 inline-flex min-h-16 min-w-[250px] items-center justify-center rounded-[16px] bg-gradient-to-r from-[#5e20df] to-[#9558f5] px-8 text-xl font-medium text-white shadow-[0_13px_26px_rgba(100,40,225,0.24)] transition hover:brightness-95">Join as a Creator <span className="ml-5 text-3xl leading-none">→</span></a>
+            <Link href="/signup" className="mt-10 inline-flex min-h-16 min-w-[250px] items-center justify-center rounded-[16px] bg-gradient-to-r from-[#5e20df] to-[#9558f5] px-8 text-xl font-medium text-white shadow-[0_13px_26px_rgba(100,40,225,0.24)] transition hover:brightness-95">Join as a Creator <span className="ml-5 text-3xl leading-none">→</span></Link>
             <div className="mt-8 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-[#30384b] sm:text-base">
               <span>Free to join</span><span className="text-[#6b30ee]">•</span><span>No hidden fees</span><span className="text-[#6b30ee]">•</span><span>Built for creators</span>
             </div>
