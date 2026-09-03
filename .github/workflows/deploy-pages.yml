@@ -2,7 +2,7 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [main]
+    branches: [main, new]
   workflow_dispatch:
 
 # Pages needs id-token to mint the deployment, pages to write it.
