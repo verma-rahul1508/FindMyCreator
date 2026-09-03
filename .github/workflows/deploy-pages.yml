@@ -44,6 +44,11 @@ jobs:
         # A project site lives under /<repo>; configure-pages reports the path.
         env:
           NEXT_PUBLIC_BASE_PATH: ${{ steps.pages.outputs.base_path }}
+          # Publishable keys — they ship in the client bundle by design. Unset
+          # is not a build failure: signup and sign-in still render, and say
+          # Supabase is not configured.
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
         run: npm run build
 
       - uses: actions/upload-pages-artifact@v3

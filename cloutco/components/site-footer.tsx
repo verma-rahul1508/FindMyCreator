@@ -1,3 +1,5 @@
+import Link from 'next/link';
+
 const creatorLinks = [
   'How It Works',
   'Create Profile',
@@ -68,9 +70,17 @@ function NavColumn({ title, links }: { title: string; links: Array<string | { la
 
           return (
             <li key={item.label}>
-              <a href={item.href} className="transition-colors hover:text-[#6b30ee]">
-                {item.label}
-              </a>
+              {/* Route links go through next/link so they inherit basePath; a
+                  bare <a href="/contact"> 404s on the GitHub Pages subpath. */}
+              {item.href.startsWith('/') ? (
+                <Link href={item.href} className="transition-colors hover:text-[#6b30ee]">
+                  {item.label}
+                </Link>
+              ) : (
+                <a href={item.href} className="transition-colors hover:text-[#6b30ee]">
+                  {item.label}
+                </a>
+              )}
             </li>
           );
         })}

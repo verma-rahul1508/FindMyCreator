@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { FormEvent, useState } from 'react';
 import { getSupabaseClient } from '@/lib/supabase/client';
 
@@ -49,6 +50,9 @@ const benefits = [
 ];
 
 export default function SigninPage() {
+  // useRouter applies basePath; window.location.assign() would not,
+  // so it 404s wherever the site is served from a subpath.
+  const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -98,7 +102,7 @@ export default function SigninPage() {
       return;
     }
 
-    window.location.assign('/dashboard');
+    router.push('/dashboard');
   };
 
   const resendConfirmation = async () => {
