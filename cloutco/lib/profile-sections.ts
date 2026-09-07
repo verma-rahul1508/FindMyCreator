@@ -16,7 +16,7 @@ export type ProfileSection = {
 };
 
 export const profileSections: ProfileSection[] = [
-  { key: 'basic-information', title: 'Basic Information', route: null, required: true },
+  { key: 'basic-information', title: 'Basic Information', route: '/profile/basic-information', required: true },
   { key: 'creator-identity', title: 'Creator Identity', route: '/profile/identity', required: true },
   { key: 'content-and-niche', title: 'Content & Niche', route: '/profile/content', required: true },
   { key: 'social-platforms', title: 'Social Platforms', route: '/profile/social', required: true },

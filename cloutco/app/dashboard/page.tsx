@@ -19,6 +19,10 @@ type Creator = {
   created_at: string;
 };
 
+type CreatorIdentity = {
+  display_name: string | null;
+};
+
 const creatorFields = 'id, full_name, email, phone_number, current_city, date_of_birth, gender, status, created_at';
 
 function Icon({ name }: { name: 'home' | 'user' | 'message' | 'settings' | 'bell' | 'arrow' | 'check' }) {
@@ -43,6 +47,7 @@ export default function DashboardPage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [creator, setCreator] = useState<Creator | null>(null);
+  const [identity, setIdentity] = useState<CreatorIdentity | null>(null);
   const [progress, setProgress] = useState<CreatorProfileProgress | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -72,8 +77,17 @@ export default function DashboardPage() {
 
       if (creatorError || !creatorData) throw creatorError || new Error('Creator profile not found.');
 
+      const { data: identityData, error: identityError } = await supabase
+        .from('creator_identity')
+        .select('display_name')
+        .eq('creator_id', creatorData.id)
+        .maybeSingle();
+
+      if (identityError) throw identityError;
+
       setUser(userData.user);
       setCreator(creatorData as Creator);
+      setIdentity(identityData as CreatorIdentity | null);
       setProgress(progressData);
       setLoading(false);
     } catch {
@@ -96,7 +110,7 @@ export default function DashboardPage() {
   if (loading) return <main className="grid min-h-screen place-items-center bg-[#fbfaff] text-sm text-[#5b6272]">Loading your creator profile...</main>;
   if (loadError || !creator || !user || !progress) return <ErrorState retry={() => void loadProfile()} />;
 
-  const name = creator.full_name.trim() || 'Creator';
+  const name = identity?.display_name?.trim() || creator.full_name.trim() || 'Creator';
   const firstName = name.split(/\s+/)[0];
   const initials = name.split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
   const progressByKey = new Map(progress.sections.map((section) => [section.key, section]));

@@ -9,8 +9,8 @@ import { loadSocialAccounts } from '@/lib/social-platform-persistence';
 import { formatPlatformCount } from '@/lib/format-number';
 
 type Creator = { id: string; full_name: string; current_city: string | null };
-type Identity = { profile_photo_url: string | null; display_name: string | null; username: string | null; bio: string | null; languages: string[] | null; creator_type: string | null; creator_type_other: string | null };
-type ContentDraft = { primary?: string; primaryOther?: string; otherNiches?: string[]; otherNichesOther?: string; contentFormats?: string[]; contentFormatsOther?: string; contentStyles?: string[]; contentStylesOther?: string };
+export type Identity = { profile_photo_url: string | null; display_name: string | null; username: string | null; bio: string | null; languages: string[] | null; creator_type: string | null; creator_type_other: string | null };
+export type ContentDraft = { primary?: string; primaryOther?: string; otherNiches?: string[]; otherNichesOther?: string; contentFormats?: string[]; contentFormatsOther?: string; contentStyles?: string[]; contentStylesOther?: string };
 type ContentProfileRow = { primary_niche: string | null; primary_niche_other: string | null; other_niches: string[] | null; other_niches_other: string | null; content_formats: string[] | null; content_formats_other: string | null; content_styles: string[] | null; content_styles_other: string | null };
 type InstagramAudience = { followers?: string; followerGrowth?: string; women?: string; men?: string; ages?: Record<string, string>; locations?: { countries?: Array<{ id?: string; name?: string; percentage?: string }>; cities?: Array<{ id?: string; name?: string; percentage?: string }> } };
 type InsightLocation = { id?: string; name?: string; percentage?: string };
@@ -25,8 +25,8 @@ type FacebookInsights = {
   source?: FacebookMetric[];
 };
 type InstagramOverview = { views?: string; interactions?: string; allInteractions?: string; postsViews?: string; reelsViews?: string; storiesViews?: string; liveVideosViews?: string };
-type SocialAccount = { id: string; platform: string; platformName?: string; profileUrl?: string; username?: string; audienceCount?: string; isPrimary?: boolean; instagramInsights?: { period?: string; overview?: InstagramOverview; audience?: InstagramAudience }; facebookInsights?: FacebookInsights };
-type PortfolioItem = { id: string; contentUrl?: string; platform?: string; contentType?: string; title?: string; description?: string; thumbnail?: string | null; createdAt?: string };
+export type SocialAccount = { id: string; platform: string; platformName?: string; profileUrl?: string; username?: string; audienceCount?: string; isPrimary?: boolean; instagramInsights?: { period?: string; overview?: InstagramOverview; audience?: InstagramAudience }; facebookInsights?: FacebookInsights };
+export type PortfolioItem = { id: string; contentUrl?: string; platform?: string; contentType?: string; title?: string; description?: string; thumbnail?: string | null; createdAt?: string };
 type PortfolioDatabaseRow = { id: string; content_url: string; platform: string; content_type: string; title: string | null; description: string | null; thumbnail_url: string | null; created_at: string };
 
 const creatorTypeLabels: Record<string, string> = { content_creator: 'Content Creator', influencer: 'Influencer', ugc_creator: 'UGC Creator', digital_creator: 'Digital Creator' };
@@ -51,8 +51,8 @@ function analyticsPeriod(account: SocialAccount) { const key = platformKey(accou
 function periodMetricLabel(period: string | undefined, metric: string) { const days = Number(period?.trim()); return Number.isInteger(days) && days > 0 ? `Last ${days} days ${metric}` : metric; }
 
 function EditLink({ href, children }: { href: string; children: ReactNode }) { return <Link href={href} className="text-[0.78rem] font-medium text-[#5f28dc] transition hover:text-[#4520a8]">{children} <span aria-hidden="true">→</span></Link>; }
-function SectionHeading({ eyebrow, title, editHref, editLabel }: { eyebrow: string; title: string; editHref?: string; editLabel: string }) { return <div className="flex flex-wrap items-end justify-between gap-4"><div><p className="text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-[#6330dc]">{eyebrow}</p><h2 className="mt-2 text-[1.35rem] font-semibold tracking-[-0.045em] text-[#1b1920] sm:text-[1.5rem]">{title}</h2></div>{editHref && <EditLink href={editHref}>{editLabel}</EditLink>}</div>; }
-function ProfileSection({ children }: { children: ReactNode }) { return <section className="border-t border-[#e6e4ea] py-8 sm:py-10">{children}</section>; }
+export function SectionHeading({ eyebrow, title, editHref, editLabel }: { eyebrow: string; title: string; editHref?: string; editLabel: string }) { return <div className="flex flex-wrap items-end justify-between gap-4"><div><p className="text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-[#6330dc]">{eyebrow}</p><h2 className="mt-2 text-[1.35rem] font-semibold tracking-[-0.045em] text-[#1b1920] sm:text-[1.5rem]">{title}</h2></div>{editHref && <EditLink href={editHref}>{editLabel}</EditLink>}</div>; }
+export function ProfileSection({ children }: { children: ReactNode }) { return <section className="border-t border-[#e6e4ea] py-8 sm:py-10">{children}</section>; }
 function EditorialPrompt({ heading, description, href, action }: { heading: string; description: string; href: string; action: string }) { return <div className="border-l-2 border-[#d9cbf7] py-0.5 pl-5"><h3 className="text-base font-medium text-[#2d2932]">{heading}</h3><p className="mt-2 max-w-2xl text-sm leading-6 text-[#696572]">{description}</p><Link href={href} className="mt-3 inline-flex text-sm font-semibold text-[#6330dc] hover:text-[#4720b2]">{action} <span aria-hidden="true" className="ml-1">→</span></Link></div>; }
 function PlatformMark({ platform, size = 'secondary' }: { platform: string; size?: 'primary' | 'secondary' }) {
   const logo = platformLogos[platformKey(platform)];
@@ -61,7 +61,7 @@ function PlatformMark({ platform, size = 'secondary' }: { platform: string; size
 }
 function AudienceBar({ label, value }: { label: string; value: string }) { return <div><div className="flex items-center justify-between gap-3 text-[0.78rem] text-[#4b4752]"><span className="truncate">{label}</span><span className="shrink-0">{value.trim()}%</span></div><div className="mt-2 h-2 overflow-hidden rounded-full bg-[#f0eff4]"><span className="block h-full rounded-full bg-[#c4a8f2]" style={{ width: `${percentWidth(value)}%` }} /></div></div>; }
 
-function ProfileSummaryCard({
+export function ProfileSummaryCard({
   displayName,
   initials,
   photoUrl,
@@ -134,7 +134,7 @@ function RecentContentStrip({ portfolio }: { portfolio: PortfolioItem[] }) {
   return <div className="mt-5 border-t border-[#ebe5f2] pt-4"><div className="flex items-center justify-between gap-3"><p className="text-xs font-semibold text-[#403b4a]">Recent Content</p><Link href="/profile/portfolio" className="shrink-0 text-xs font-semibold text-[#6330dc] hover:text-[#4720b2]">View selected work <span aria-hidden="true">&rarr;</span></Link></div><div className="mt-3 flex items-center gap-2.5">{visibleItems.map((item) => <div key={item.id} className="h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-[#e9e3f1] bg-[#f5f1fa] sm:h-[4.5rem] sm:w-[4.5rem]"><img src={item.thumbnail} alt={item.title?.trim() || ''} className="h-full w-full object-cover" /></div>)}{remainingCount > 0 && <div className="grid h-16 w-16 shrink-0 place-items-center rounded-lg border border-[#e1d6f4] bg-[#f3edff] px-2 text-center text-xs font-semibold leading-4 text-[#6130d5] sm:h-[4.5rem] sm:w-[4.5rem]">+{remainingCount} more</div>}</div></div>;
 }
 
-function PrimaryPlatformCard({ account, portfolio }: { account: SocialAccount; portfolio: PortfolioItem[] }) {
+export function PrimaryPlatformCard({ account, portfolio }: { account: SocialAccount; portfolio: PortfolioItem[] }) {
   const accountPlatform = platformKey(account.platform);
   const displayPlatformName = platformName(account);
   const followerLabel = accountPlatform === 'youtube' ? 'Subscribers' : 'Followers';
@@ -166,7 +166,7 @@ function PrimaryPlatformCard({ account, portfolio }: { account: SocialAccount; p
   </article>;
 }
 
-function AudiencePanel({ account }: { account?: SocialAccount }) {
+export function AudiencePanel({ account }: { account?: SocialAccount }) {
   const accountPlatform = platformKey(account?.platform);
   const displayPlatformName = account ? platformName(account) : '';
   const instagramAudience = accountPlatform === 'instagram' ? account?.instagramInsights?.audience : undefined;
@@ -196,7 +196,7 @@ function AudiencePanel({ account }: { account?: SocialAccount }) {
   </aside>;
 }
 
-function CompactSecondaryPlatformCard({ account }: { account: SocialAccount }) {
+export function CompactSecondaryPlatformCard({ account }: { account: SocialAccount }) {
   const displayPlatformName = platformName(account);
   const followerLabel = platformKey(account.platform) === 'youtube' ? 'Subscribers' : 'Followers';
   const profileUrl = safeExternalUrl(account.profileUrl);
