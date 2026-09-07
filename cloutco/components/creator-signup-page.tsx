@@ -185,13 +185,10 @@ export function CreatorSignupPage() {
         throw new Error('Unable to create auth user.');
       }
 
+      setValues(initialValues);
+      setTouched({});
       setSubmitState('success');
-      setNotification({
-        type: 'success',
-        text: signUpData.session
-          ? 'Account created successfully.'
-          : 'Your account has been created. Please check your email to verify your account.',
-      });
+      setNotification(null);
     } catch (error) {
       setSubmitState('idle');
       const message = error instanceof Error ? error.message : 'Unable to create your account right now.';
@@ -275,6 +272,20 @@ export function CreatorSignupPage() {
             </p>
           </div>
 
+          {submitState === 'success' ? (
+            <section className="flex min-h-[520px] flex-col items-center justify-center px-4 py-10 text-center sm:px-10">
+              <span className="grid h-14 w-14 place-items-center rounded-full bg-[#f0e7ff] text-[#6a2cf0]">
+                <svg viewBox="0 0 24 24" aria-hidden="true" className="h-7 w-7 fill-none stroke-current stroke-[1.8]">
+                  <path d="M4 6.5h16v11H4z" />
+                  <path d="m4.5 7 7.5 5.5L19.5 7" />
+                </svg>
+              </span>
+              <h3 className="mt-6 text-[2rem] font-semibold tracking-[-0.05em] text-black sm:text-[2.25rem]">Check your email to continue</h3>
+              <p className="mt-3 max-w-md text-base leading-7 text-[#4d5667]">We&apos;ve sent a verification link to your email address. Please verify your email to continue to CloutCo.</p>
+              <p className="mt-3 max-w-md text-sm leading-6 text-[#667189]">Once your email is verified, you can sign in to your account.</p>
+              <Link href="/signin" className="mt-8 inline-flex min-h-12 items-center justify-center rounded-xl bg-gradient-to-r from-[#5d2adf] to-[#7a58ea] px-6 text-base font-medium text-white shadow-[0_12px_24px_rgba(94,42,223,0.2)] transition hover:brightness-105">Go to Sign In <span aria-hidden="true" className="ml-2 text-lg">&rarr;</span></Link>
+            </section>
+          ) : (
           <form onSubmit={handleSubmit} noValidate className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="sm:col-span-1">
@@ -520,6 +531,7 @@ export function CreatorSignupPage() {
               </div>
             )}
           </form>
+          )}
         </div>
       </div>
     </div>
