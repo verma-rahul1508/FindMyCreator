@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
+import { AuthAwareLogo } from '@/components/auth-aware-logo';
 
 const navItems = [
   { label: 'For Creators', href: '#creators' },
@@ -29,11 +30,11 @@ export function SiteHeader() {
   return (
     <header className="sticky top-0 z-50 border-b border-black/5 bg-[#fffdfc]/90 backdrop-blur-sm">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
-        <Link href="/" className="flex items-center" aria-label="CloutCo home">
+        <AuthAwareLogo className="flex items-center" ariaLabel="CloutCo home">
           <span className="text-[1.5rem] font-semibold tracking-[-0.08em] text-black sm:text-[1.75rem]">
             Clout<span className="text-[#7c6ae7]">Co</span>
           </span>
-        </Link>
+        </AuthAwareLogo>
 
         <nav className="hidden items-center gap-8 md:flex" aria-label="Main navigation">
           {navItems.map((item) => (
