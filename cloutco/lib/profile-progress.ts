@@ -76,6 +76,14 @@ type FacebookAnalyticsRecord = {
   net_followers: number | string | null;
 };
 
+type YouTubeAnalyticsRecord = {
+  social_platform_id: string;
+  views: number | string | null;
+  likes: number | string | null;
+  shares: number | string | null;
+  top_country: string | null;
+};
+
 type CreatorPortfolioItemRecord = {
   content_url: string | null;
   platform: string | null;
@@ -197,17 +205,24 @@ function isPersistedFacebookAnalyticsComplete(analytics: FacebookAnalyticsRecord
   ].every(isNonNegativeWholeNumber));
 }
 
+function isPersistedYouTubeAnalyticsComplete(analytics: YouTubeAnalyticsRecord | undefined) {
+  return Boolean(analytics
+    && [analytics.views, analytics.likes, analytics.shares].every(isNonNegativeWholeNumber)
+    && isNonBlank(analytics.top_country));
+}
+
 function isSocialPlatformsComplete(
   platforms: SocialPlatformRecord[],
   latestSnapshots: Map<string, SocialSnapshotRecord>,
   instagramAnalytics: Map<string, InstagramAnalyticsRecord>,
   facebookAnalytics: Map<string, FacebookAnalyticsRecord>,
+  youtubeAnalytics: Map<string, YouTubeAnalyticsRecord>,
 ) {
   if (!platforms.length || !platforms.every((platform) => isHttpUrl(platform.profile_url) && isNonNegativeWholeNumber(platform.audience_count))) return false;
 
   const primaryPlatform = platforms.find((platform) => platform.is_primary);
   if (!primaryPlatform) return false;
-  if (primaryPlatform.platform === 'youtube') return true;
+  if (primaryPlatform.platform === 'youtube') return isPersistedYouTubeAnalyticsComplete(youtubeAnalytics.get(primaryPlatform.id));
 
   const snapshot = latestSnapshots.get(primaryPlatform.id);
   if (!snapshot || snapshot.platform !== primaryPlatform.platform) return false;
@@ -255,15 +270,22 @@ export async function loadCreatorProfileProgress(): Promise<CreatorProfileProgre
   let latestSnapshots = new Map<string, SocialSnapshotRecord>();
   let instagramAnalytics = new Map<string, InstagramAnalyticsRecord>();
   let facebookAnalytics = new Map<string, FacebookAnalyticsRecord>();
+  let youtubeAnalytics = new Map<string, YouTubeAnalyticsRecord>();
 
   if (platformIds.length) {
-    const { data: snapshotData, error: snapshotError } = await supabase
-      .from('creator_social_analytics_snapshots')
-      .select('id, social_platform_id, platform, updated_at')
-      .in('social_platform_id', platformIds)
-      .eq('is_current', true)
-      .order('updated_at', { ascending: false });
+    const [snapshotResult, youtubeResult] = await Promise.all([
+      supabase
+        .from('creator_social_analytics_snapshots')
+        .select('id, social_platform_id, platform, updated_at')
+        .in('social_platform_id', platformIds)
+        .eq('is_current', true)
+        .order('updated_at', { ascending: false }),
+      supabase.from('creator_youtube_analytics').select('social_platform_id, views, likes, shares, top_country').in('social_platform_id', platformIds),
+    ]);
+    const { data: snapshotData, error: snapshotError } = snapshotResult;
     throwIfError(snapshotError, 'We could not load social analytics snapshots');
+    throwIfError(youtubeResult.error, 'We could not load YouTube analytics');
+    youtubeAnalytics = new Map(((youtubeResult.data || []) as YouTubeAnalyticsRecord[]).map((analytics) => [analytics.social_platform_id, analytics]));
 
     for (const snapshot of (snapshotData || []) as SocialSnapshotRecord[]) {
       if (!latestSnapshots.has(snapshot.social_platform_id)) latestSnapshots.set(snapshot.social_platform_id, snapshot);
@@ -287,7 +309,7 @@ export async function loadCreatorProfileProgress(): Promise<CreatorProfileProgre
     'basic-information': isBasicInformationComplete(creator),
     'creator-identity': isCreatorIdentityComplete(identityResult.data as CreatorIdentityRecord | null),
     'content-and-niche': isContentAndNicheComplete(contentResult.data as CreatorContentProfileRecord | null),
-    'social-platforms': isSocialPlatformsComplete(platforms, latestSnapshots, instagramAnalytics, facebookAnalytics),
+    'social-platforms': isSocialPlatformsComplete(platforms, latestSnapshots, instagramAnalytics, facebookAnalytics, youtubeAnalytics),
     'portfolio': portfolioItems.some(isPersistedPortfolioItemComplete),
   };
 

@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { User } from '@supabase/supabase-js';
 import { AuthAwareLogo } from '@/components/auth-aware-logo';
+import { AuthenticatedCreatorHeaderIdentity } from '@/components/authenticated-creator-header-identity';
 import { CreatorMobileNavigation } from '@/components/creator-mobile-navigation';
 import { getSupabaseClient } from '@/lib/supabase/client';
 import { loadCreatorProfileProgress, type CreatorProfileProgress } from '@/lib/profile-progress';
@@ -41,10 +42,22 @@ type SocialAccount = {
     };
     audience: {
       netFollowers: string;
+      ageGroups: Array<{ name: string; value: string }>;
+      locations: {
+        cities: Array<{ name: string; percentage: string }>;
+      };
     };
   };
+  youtubeInsights?: {
+    views: string;
+    likes: string;
+    shares: string;
+    topCountry: string;
+  };
 };
-type InsightIcon = 'eye' | 'heart' | 'users' | 'trend';
+type InsightIcon = 'eye' | 'heart' | 'users' | 'trend' | 'pin';
+type InsightCard = { label: string; value: string; icon: InsightIcon; textValue?: boolean };
+const definedInsightCards = (cards: Array<InsightCard | null>) => cards.filter((card): card is InsightCard => card !== null);
 type IconName = 'home' | 'user' | 'check' | 'message' | 'settings' | 'bell' | 'chevron' | 'arrow' | 'spark' | 'document' | 'shield' | 'identity' | 'content' | 'social' | 'portfolio' | 'flip' | 'share' | 'pin' | InsightIcon;
 
 const creatorFields = 'id, public_profile_id, full_name, email, phone_number, current_city, date_of_birth, gender, status, created_at';
@@ -93,6 +106,16 @@ function platformName(account: SocialAccount) { const key = platformKey(account.
 function usernameLabel(username?: string | null) { const value = username?.trim().replace(/^@+/, ''); return value ? '@' + value : ''; }
 function creatorTypeLabel(identity: Identity | null) { const type = identity?.creator_type?.trim() || ''; if (!type) return ''; return type.toLowerCase() === 'other' ? identity?.creator_type_other?.trim() || '' : creatorTypeLabels[type] || type; }
 function primaryNicheLabel(content: ContentProfile | null) { const niche = content?.primary_niche?.trim() || ''; if (!niche) return ''; return niche.toLowerCase() === 'other' ? content?.primary_niche_other?.trim() || '' : niche; }
+function highestRankedAudienceLabel(items: Array<{ label: string; percentage: string }>) {
+  let highest: { label: string; percentage: number } | null = null;
+  for (const item of items) {
+    const label = item.label.trim();
+    const percentage = Number(item.percentage);
+    if (!label || !Number.isFinite(percentage) || percentage < 0 || (highest && percentage <= highest.percentage)) continue;
+    highest = { label, percentage };
+  }
+  return highest?.label || '';
+}
 function PlatformLogo({ platform, className = '' }: { platform: string; className?: string }) { const logo = platformLogos[platformKey(platform)]; return logo ? <img src={logo} alt="" className={className} /> : null; }
 function CreatorCardAction({ icon, label, onClick, filled = false }: { icon: 'flip' | 'share'; label: string; onClick: () => void; filled?: boolean }) {
   const [hideTooltip, setHideTooltip] = useState(false);
@@ -115,10 +138,11 @@ function CreatorCard({ creator, identity, content, photoUrl, socialAccounts, ini
   const secondaryAccounts = primaryAccount ? socialAccounts.filter((account) => account.id !== primaryAccount.id) : socialAccounts;
   const primaryInstagramAccount = primaryAccount && platformKey(primaryAccount.platform) === 'instagram' ? primaryAccount : null;
   const primaryFacebookAccount = primaryAccount && platformKey(primaryAccount.platform) === 'facebook' ? primaryAccount : null;
+  const primaryYouTubeAccount = primaryAccount && platformKey(primaryAccount.platform) === 'youtube' ? primaryAccount : null;
   const secondaryPlatformAccounts = secondaryAccounts;
   const instagramPeriod = primaryInstagramAccount?.instagramInsights?.period.trim() || '';
   const facebookPeriod = primaryFacebookAccount?.facebookInsights?.period.trim() || '';
-  const instagramInsightCards = [
+  const instagramInsightCards = definedInsightCards([
     instagramPeriod && primaryInstagramAccount?.instagramInsights?.overview.views.trim()
       ? { label: 'Last ' + instagramPeriod + ' days Views', value: primaryInstagramAccount.instagramInsights.overview.views, icon: 'eye' as const }
       : null,
@@ -131,26 +155,40 @@ function CreatorCard({ creator, identity, content, photoUrl, socialAccounts, ini
     primaryInstagramAccount?.instagramInsights?.overview.netFollowers.trim()
       ? { label: 'Net Followers', value: primaryInstagramAccount.instagramInsights.overview.netFollowers, icon: 'trend' as const }
       : null,
-  ].filter((card): card is { label: string; value: string; icon: InsightIcon } => card !== null);
-  const facebookInsightCards = [
+  ]);
+  const facebookTopAge = highestRankedAudienceLabel((primaryFacebookAccount?.facebookInsights?.audience.ageGroups || []).map((ageGroup) => ({ label: ageGroup.name, percentage: ageGroup.value })));
+  const facebookTopCity = highestRankedAudienceLabel((primaryFacebookAccount?.facebookInsights?.audience.locations.cities || []).map((city) => ({ label: city.name, percentage: city.percentage })));
+  const facebookInsightCards = definedInsightCards([
     facebookPeriod && primaryFacebookAccount?.facebookInsights?.overview.viewsTotal.trim()
       ? { label: 'Last ' + facebookPeriod + ' days Views', value: primaryFacebookAccount.facebookInsights.overview.viewsTotal, icon: 'eye' as const }
       : null,
     facebookPeriod && primaryFacebookAccount?.facebookInsights?.engagement.total.trim()
       ? { label: 'Last ' + facebookPeriod + ' days Engagement', value: primaryFacebookAccount.facebookInsights.engagement.total, icon: 'heart' as const }
       : null,
-    primaryFacebookAccount?.audienceCount.trim()
-      ? { label: 'Followers', value: primaryFacebookAccount.audienceCount, icon: 'users' as const }
+    facebookTopAge
+      ? { label: 'Top Age', value: facebookTopAge, icon: 'users' as const, textValue: true }
       : null,
-    primaryFacebookAccount?.facebookInsights?.audience.netFollowers.trim()
-      ? { label: 'Net Followers', value: primaryFacebookAccount.facebookInsights.audience.netFollowers, icon: 'trend' as const }
+    facebookTopCity
+      ? { label: 'Top City', value: facebookTopCity, icon: 'pin' as const, textValue: true }
       : null,
-  ].filter((card): card is { label: string; value: string; icon: InsightIcon } => card !== null);
-  const primaryInsightCards = primaryInstagramAccount ? instagramInsightCards : primaryFacebookAccount ? facebookInsightCards : [];
+  ]);
+  const youtubeInsightCards = definedInsightCards([
+    primaryYouTubeAccount?.youtubeInsights?.views.trim()
+      ? { label: 'Views', value: primaryYouTubeAccount.youtubeInsights.views, icon: 'eye' as const }
+      : null,
+    primaryYouTubeAccount?.youtubeInsights?.likes.trim()
+      ? { label: 'Likes', value: primaryYouTubeAccount.youtubeInsights.likes, icon: 'heart' as const }
+      : null,
+    primaryYouTubeAccount?.youtubeInsights?.shares.trim()
+      ? { label: 'Shares', value: primaryYouTubeAccount.youtubeInsights.shares, icon: 'trend' as const }
+      : null,
+    primaryYouTubeAccount?.youtubeInsights?.topCountry.trim()
+      ? { label: 'Top Country', value: primaryYouTubeAccount.youtubeInsights.topCountry, icon: 'pin' as const, textValue: true }
+      : null,
+  ]);
+  const primaryInsightCards = primaryInstagramAccount ? instagramInsightCards : primaryFacebookAccount ? facebookInsightCards : primaryYouTubeAccount ? youtubeInsightCards : [];
   const primaryInsightsEmptyMessage = primaryAccount
-    ? platformKey(primaryAccount.platform) === 'youtube'
-      ? 'Primary platform insights are not available for YouTube.'
-      : 'Add ' + platformName(primaryAccount) + ' analytics in Social Platforms to show insights here.'
+    ? 'Add ' + platformName(primaryAccount) + ' analytics in Social Platforms to show insights here.'
     : 'Add a primary platform in Social Platforms to show insights here.';
   const transition = reducedMotion ? 'none' : 'transform 600ms cubic-bezier(0.22, 0.61, 0.36, 1)';
   const audienceLabel = platformKey(primaryAccount?.platform) === 'youtube' ? 'Subscribers' : 'Followers';
@@ -225,7 +263,7 @@ function CreatorCard({ creator, identity, content, photoUrl, socialAccounts, ini
             <section className="flex min-h-0 min-w-0 flex-col p-4 sm:p-5" aria-labelledby="creator-card-insights">
               <p className="text-[0.6rem] font-bold uppercase tracking-[0.2em] text-[#6330dc]">Social Presence</p>
               <h2 id="creator-card-insights" className="mt-1.5 text-[1.35rem] font-semibold leading-none tracking-[-0.055em] text-[#15121b] sm:text-[1.55rem]">Primary insights</h2>
-              {primaryInsightCards.length ? <div className="mt-3 grid flex-1 grid-cols-2 gap-2 sm:mt-4 sm:gap-3">{primaryInsightCards.map((card) => <div key={card.label} className="flex min-w-0 flex-col justify-between rounded-xl border border-[#e5dcf6] bg-white/75 p-2.5 shadow-[0_6px_16px_rgba(70,43,118,0.03)] sm:p-3"><div className="flex min-w-0 items-start gap-2"><span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[#f1eaff] text-[#6d35e5]"><Icon name={card.icon} /></span><p className="min-w-0 pt-0.5 text-[0.62rem] font-medium leading-4 text-[#7375a0]">{card.label}</p></div><p className="mt-2 break-words text-[1.2rem] font-semibold leading-none tracking-[-0.05em] text-[#19161f] sm:text-[1.45rem]">{formatPlatformCount(card.value)}</p></div>)}</div> : <p className="mt-4 text-xs leading-5 text-[#7275a0]">{primaryInsightsEmptyMessage}</p>}
+              {primaryInsightCards.length ? <div className="mt-3 grid flex-1 grid-cols-2 gap-2 sm:mt-4 sm:gap-3">{primaryInsightCards.map((card) => <div key={card.label} className="flex min-w-0 flex-col justify-between rounded-xl border border-[#e5dcf6] bg-white/75 p-2.5 shadow-[0_6px_16px_rgba(70,43,118,0.03)] sm:p-3"><div className="flex min-w-0 items-start gap-2"><span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[#f1eaff] text-[#6d35e5]"><Icon name={card.icon} /></span><p className="min-w-0 pt-0.5 text-[0.62rem] font-medium leading-4 text-[#7375a0]">{card.label}</p></div><p className="mt-2 break-words text-[1.2rem] font-semibold leading-none tracking-[-0.05em] text-[#19161f] sm:text-[1.45rem]">{card.textValue ? card.value : formatPlatformCount(card.value)}</p></div>)}</div> : <p className="mt-4 text-xs leading-5 text-[#7275a0]">{primaryInsightsEmptyMessage}</p>}
             </section>
             <section className="flex min-h-0 min-w-0 flex-col border-t border-[#e6dff5] p-4 sm:border-l sm:border-t-0 sm:p-5" aria-labelledby="creator-card-other-platforms">
               <p className="text-[0.6rem] font-bold uppercase tracking-[0.2em] text-[#6330dc]">Other Platforms</p>
@@ -253,7 +291,6 @@ export default function ProfilePage() {
   const [progress, setProgress] = useState<CreatorProfileProgress | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
-  const [signingOut, setSigningOut] = useState(false);
 
   const loadProfile = async () => {
     setLoading(true);
@@ -295,15 +332,6 @@ export default function ProfilePage() {
 
   useEffect(() => { void loadProfile(); }, []);
 
-  const signOut = async () => {
-    const supabase = getSupabaseClient();
-    if (!supabase) return;
-    setSigningOut(true);
-    const { error } = await supabase.auth.signOut();
-    if (!error) router.replace('/signin');
-    else setSigningOut(false);
-  };
-
   if (loading) return <LoadingState />;
   if (loadError || !creator || !user || !progress) return <ErrorState retry={() => void loadProfile()} />;
 
@@ -318,7 +346,7 @@ export default function ProfilePage() {
   const statusCopy = creator.status === 'pending' ? 'Your profile is being prepared.' : creator.status === 'active' ? 'Your creator profile is active.' : 'Your profile is currently not active.';
 
   return <main className="min-h-screen bg-[#fbfaff] text-[#151518]">
-    <header className="flex h-[78px] items-center justify-between border-b border-[#e8e7eb] bg-white px-5 sm:px-8 lg:px-10"><AuthAwareLogo className="text-[1.5rem] font-semibold tracking-[-0.08em] text-black sm:text-[1.8rem]">CLOUTCO<span className="text-[#6330dc]">.</span></AuthAwareLogo><div className="flex items-center gap-4 sm:gap-6"><button type="button" className="text-[#525966]" aria-label="Notifications"><Icon name="bell" /></button><CreatorMobileNavigation currentPage="profile" additionalItems={[{ label: 'Messages', href: '#next-steps' }, { label: 'Settings', href: '#profile-status' }]} /><div className="hidden h-8 w-px bg-[#e7e7eb] sm:block" /><details className="group relative"><summary className="flex cursor-pointer list-none items-center gap-3"><span className="grid h-10 w-10 place-items-center overflow-hidden rounded-full bg-[#eee8ff] text-sm font-semibold text-[#6330dc]">{profilePhotoUrl ? <img src={profilePhotoUrl} alt={`${name} profile photo`} className="h-full w-full object-cover" /> : initials}</span><span className="hidden text-left sm:block"><strong className="block max-w-[160px] truncate text-sm font-semibold">{name}</strong><span className="block text-xs text-[#707787]">Creator</span></span><span className="hidden text-[#656c7a] sm:block">⌄</span></summary><div className="absolute right-0 top-12 z-20 w-44 rounded-xl border border-[#e3e1e9] bg-white p-2 shadow-[0_12px_30px_rgba(45,35,75,0.12)]"><Link href="/profile" className="block w-full rounded-lg px-3 py-2 text-left text-sm text-[#30333b] hover:bg-[#f7f4ff]">View Profile</Link><button type="button" onClick={signOut} disabled={signingOut} className="w-full rounded-lg px-3 py-2 text-left text-sm text-[#30333b] hover:bg-[#f7f4ff]">{signingOut ? 'Signing out...' : 'Sign out'}</button></div></details></div></header>
+    <header className="flex h-[78px] items-center justify-between border-b border-[#e8e7eb] bg-white px-5 sm:px-8 lg:px-10"><AuthAwareLogo className="text-[1.5rem] font-semibold tracking-[-0.08em] text-black sm:text-[1.8rem]">CLOUTCO<span className="text-[#6330dc]">.</span></AuthAwareLogo><div className="flex items-center gap-4 sm:gap-6"><button type="button" className="text-[#525966]" aria-label="Notifications"><Icon name="bell" /></button><CreatorMobileNavigation currentPage="profile" additionalItems={[{ label: 'Messages', href: '#next-steps' }, { label: 'Settings', href: '#profile-status' }]} /><div className="hidden h-8 w-px bg-[#e7e7eb] sm:block" /><AuthenticatedCreatorHeaderIdentity variant="menu" /></div></header>
     <div className="mx-auto flex max-w-[1600px]">
       <aside className="hidden w-[230px] shrink-0 border-r border-[#e8e7eb] bg-white px-5 py-8 lg:block"><nav className="space-y-2" aria-label="Creator navigation"><Link href="/dashboard" className="flex items-center gap-3 rounded-xl px-4 py-3.5 text-sm text-[#424754] hover:bg-[#faf8ff]"><Icon name="home" />Dashboard</Link><a href="#profile-sections" className="flex items-center gap-3 rounded-xl bg-[#f1ebff] px-4 py-3.5 text-sm font-medium text-[#6330dc]"><Icon name="user" />My Profile</a><a href="#next-steps" className="flex items-center gap-3 rounded-xl px-4 py-3.5 text-sm text-[#424754] hover:bg-[#faf8ff]"><Icon name="message" />Messages</a><a href="#profile-status" className="flex items-center gap-3 rounded-xl px-4 py-3.5 text-sm text-[#424754] hover:bg-[#faf8ff]"><Icon name="settings" />Settings</a></nav><div className="mt-36 rounded-2xl border border-[#e8e0fa] bg-[#fbf9ff] p-5"><div className="grid h-9 w-9 place-items-center rounded-full border border-[#d9c8ff] text-[#6330dc]"><Icon name="spark" /></div><h2 className="mt-5 text-sm font-semibold">Complete your profile</h2><p className="mt-2 text-xs leading-5 text-[#626a7a]">Build your professional creator profile on CloutCo.</p><p className="mt-4 text-xs font-medium text-[#34363d]">{progress.completedCount} of {progress.requiredCount} sections completed</p><p className="mt-2 text-xs text-[#777e8d]">{nextSection ? 'Next: ' + nextSection.title : 'Required sections complete'}</p>{nextSection ? <Link href={nextProfileRoute} className="mt-5 flex items-center justify-center gap-2 rounded-lg border border-[#d3c1ff] px-3 py-2.5 text-xs font-medium text-[#6330dc]">Continue Profile <Icon name="arrow" /></Link> : <span className="mt-5 flex items-center justify-center rounded-lg border border-[#e2ddec] px-3 py-2.5 text-xs font-medium text-[#777e8d]">Required sections complete</span>}</div></aside>
       <div className="min-w-0 flex-1 px-5 py-9 sm:px-8 lg:px-12 lg:py-11">

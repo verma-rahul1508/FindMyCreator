@@ -25,7 +25,8 @@ type FacebookInsights = {
   source?: FacebookMetric[];
 };
 type InstagramOverview = { views?: string; interactions?: string; allInteractions?: string; postsViews?: string; reelsViews?: string; storiesViews?: string; liveVideosViews?: string };
-export type SocialAccount = { id: string; platform: string; platformName?: string; profileUrl?: string; username?: string; audienceCount?: string; isPrimary?: boolean; instagramInsights?: { period?: string; overview?: InstagramOverview; audience?: InstagramAudience }; facebookInsights?: FacebookInsights };
+type YouTubeInsights = { views?: string; likes?: string; shares?: string; topCountry?: string };
+export type SocialAccount = { id: string; platform: string; platformName?: string; profileUrl?: string; username?: string; audienceCount?: string; isPrimary?: boolean; instagramInsights?: { period?: string; overview?: InstagramOverview; audience?: InstagramAudience }; facebookInsights?: FacebookInsights; youtubeInsights?: YouTubeInsights };
 export type PortfolioItem = { id: string; contentUrl?: string; platform?: string; contentType?: string; title?: string; description?: string; thumbnail?: string | null; createdAt?: string };
 type PortfolioDatabaseRow = { id: string; content_url: string; platform: string; content_type: string; title: string | null; description: string | null; thumbnail_url: string | null; created_at: string };
 
@@ -142,6 +143,7 @@ export function PrimaryPlatformCard({ account, portfolio }: { account: SocialAcc
   const period = analyticsPeriod(account);
   const instagramOverview = account.instagramInsights?.overview;
   const facebookInsights = account.facebookInsights;
+  const youtubeInsights = accountPlatform === 'youtube' ? account.youtubeInsights : undefined;
   const instagramTopContent = highestProvidedMetric([
     { name: 'Post', value: instagramOverview?.postsViews },
     { name: 'Reel', value: instagramOverview?.reelsViews },
@@ -149,7 +151,7 @@ export function PrimaryPlatformCard({ account, portfolio }: { account: SocialAcc
     { name: 'Live Video', value: instagramOverview?.liveVideosViews },
   ]);
   const facebookTopContent = highestPercentage(facebookInsights?.overview?.mediaTypes);
-  const views = accountPlatform === 'instagram' ? instagramOverview?.views : accountPlatform === 'facebook' ? facebookInsights?.overview?.viewsTotal : '';
+  const views = accountPlatform === 'instagram' ? instagramOverview?.views : accountPlatform === 'facebook' ? facebookInsights?.overview?.viewsTotal : youtubeInsights?.views;
   const interactions = accountPlatform === 'instagram' ? instagramOverview?.interactions : accountPlatform === 'facebook' ? facebookInsights?.engagement?.total : '';
   const topViewContent = accountPlatform === 'instagram' ? instagramTopContent?.name?.trim() || '' : accountPlatform === 'facebook' ? facebookTopContent?.mediaType?.trim() || '' : '';
   const metrics = [
@@ -157,6 +159,9 @@ export function PrimaryPlatformCard({ account, portfolio }: { account: SocialAcc
     views?.trim() ? { label: periodMetricLabel(period, 'Views'), value: formatCount(views), icon: 'views' as const } : null,
     interactions?.trim() ? { label: periodMetricLabel(period, 'Interactions'), value: formatCount(interactions), icon: 'interactions' as const } : null,
     topViewContent ? { label: 'Top View Content', value: topViewContent, icon: 'content' as const } : null,
+    accountPlatform === 'youtube' && youtubeInsights?.likes?.trim() ? { label: 'Likes', value: formatCount(youtubeInsights.likes), icon: 'interactions' as const } : null,
+    accountPlatform === 'youtube' && youtubeInsights?.shares?.trim() ? { label: 'Shares', value: formatCount(youtubeInsights.shares), icon: 'growth' as const } : null,
+    accountPlatform === 'youtube' && youtubeInsights?.topCountry?.trim() ? { label: 'Top Country', value: youtubeInsights.topCountry.trim(), icon: 'city' as const } : null,
   ].filter(Boolean) as Array<{ label: string; value: string; icon: MetricIcon }>;
 
   return <article className="h-full rounded-2xl border border-[#ded1f6] bg-[linear-gradient(135deg,#fff_0%,#fefcff_72%,#f7f2ff_100%)] p-5 shadow-[0_10px_28px_rgba(60,42,90,0.035)] sm:p-6">

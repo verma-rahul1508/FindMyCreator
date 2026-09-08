@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { User } from '@supabase/supabase-js';
 import { AuthAwareLogo } from '@/components/auth-aware-logo';
+import { AuthenticatedCreatorHeaderIdentity } from '@/components/authenticated-creator-header-identity';
 import { CreatorMobileNavigation } from '@/components/creator-mobile-navigation';
 import { getSupabaseClient } from '@/lib/supabase/client';
 import { loadCreatorProfileProgress, type CreatorProfileProgress } from '@/lib/profile-progress';
@@ -53,7 +54,6 @@ export default function DashboardPage() {
   const [progress, setProgress] = useState<CreatorProfileProgress | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
-  const [signingOut, setSigningOut] = useState(false);
 
   const loadProfile = async () => {
     setLoading(true);
@@ -100,21 +100,11 @@ export default function DashboardPage() {
 
   useEffect(() => { void loadProfile(); }, []);
 
-  const signOut = async () => {
-    const supabase = getSupabaseClient();
-    if (!supabase) return;
-    setSigningOut(true);
-    const { error } = await supabase.auth.signOut();
-    if (!error) router.replace('/signin');
-    else setSigningOut(false);
-  };
-
   if (loading) return <main className="grid min-h-screen place-items-center bg-[#fbfaff] text-sm text-[#5b6272]">Loading your creator profile...</main>;
   if (loadError || !creator || !user || !progress) return <ErrorState retry={() => void loadProfile()} />;
 
   const name = identity?.display_name?.trim() || creator.full_name.trim() || 'Creator';
   const firstName = name.split(/\s+/)[0];
-  const initials = name.split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
   const progressByKey = new Map(progress.sections.map((section) => [section.key, section]));
   const basicInformation = progressByKey.get('basic-information');
   const creatorIdentity = progressByKey.get('creator-identity');
@@ -128,7 +118,7 @@ export default function DashboardPage() {
   return <main className="min-h-screen bg-[#fbfaff] text-[#151518]">
     <header className="flex h-[78px] items-center justify-between border-b border-[#e8e7eb] bg-white px-5 sm:px-8 lg:px-10">
       <AuthAwareLogo className="text-[1.5rem] font-semibold tracking-[-0.08em] text-black sm:text-[1.8rem]">CLOUTCO<span className="text-[#6330dc]">.</span></AuthAwareLogo>
-      <div className="flex items-center gap-4 sm:gap-6"><button type="button" className="text-[#525966]" aria-label="Notifications"><Icon name="bell" /></button><CreatorMobileNavigation currentPage="dashboard" additionalItems={[{ label: 'Messages', href: '#next-steps' }, { label: 'Settings', href: '#account' }]} /><details className="group relative"><summary className="flex cursor-pointer list-none items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-full bg-[#eee8ff] text-sm font-semibold text-[#6330dc]">{initials}</span><span className="hidden text-left sm:block"><strong className="block max-w-[160px] truncate text-sm font-semibold">{name}</strong><span className="block text-xs text-[#707787]">Creator</span></span><span className="hidden text-[#656c7a] sm:block">⌄</span></summary><div className="absolute right-0 top-12 z-20 w-44 rounded-xl border border-[#e3e1e9] bg-white p-2 shadow-lg"><Link href="/profile" className="block w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-[#f7f4ff]">View Profile</Link><button type="button" onClick={signOut} disabled={signingOut} className="w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-[#f7f4ff]">{signingOut ? 'Signing out...' : 'Sign out'}</button></div></details></div>
+      <div className="flex items-center gap-4 sm:gap-6"><button type="button" className="text-[#525966]" aria-label="Notifications"><Icon name="bell" /></button><CreatorMobileNavigation currentPage="dashboard" additionalItems={[{ label: 'Messages', href: '#next-steps' }, { label: 'Settings', href: '#account' }]} /><AuthenticatedCreatorHeaderIdentity variant="menu" menuShadowClassName="shadow-lg" /></div>
     </header>
 
     <div className="mx-auto flex max-w-[1600px]">
