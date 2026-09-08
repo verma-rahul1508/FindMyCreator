@@ -45,6 +45,7 @@ function toSocialAccount(account: PublicSocialAccount, index: number): SocialAcc
 export default function PublicCreatorProfilePage() {
   const params = useParams<{ publicIdentifier: string }>();
   const [profile, setProfile] = useState<PublicProfile | null>(null);
+  const [photoUrl, setPhotoUrl] = useState('');
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
 
@@ -54,7 +55,15 @@ export default function PublicCreatorProfilePage() {
       if (!supabase || !params.publicIdentifier) { setLoadError(true); setLoading(false); return; }
       const { data, error } = await supabase.rpc('get_public_creator_profile', { p_public_profile_id: params.publicIdentifier });
       if (error || !data) { setLoadError(true); setLoading(false); return; }
-      setProfile(data as PublicProfile);
+      let signedPhotoUrl = '';
+      try {
+        const photoResponse = await fetch(`/api/creator/${encodeURIComponent(params.publicIdentifier)}/photo`, { cache: 'no-store' });
+        if (photoResponse.ok) {
+          const photo = await photoResponse.json() as { url?: unknown };
+          if (typeof photo.url === 'string') signedPhotoUrl = photo.url;
+        }
+      } catch { /* Preserve the initials fallback when the photo is unavailable. */ }
+      setProfile(data as PublicProfile); setPhotoUrl(signedPhotoUrl);
       setLoading(false);
     };
     void loadProfile();
@@ -80,7 +89,7 @@ export default function PublicCreatorProfilePage() {
 
   return <main className="min-h-screen bg-[#fbfaff] px-3 py-3 text-[#19171d] sm:px-5 sm:py-5">
     <div className="mx-auto max-w-[1180px] overflow-hidden rounded-xl border border-[#ebe7f0] bg-white shadow-[0_12px_34px_rgba(60,42,90,0.04)]">
-      <div className="mt-3 px-7 sm:px-9"><ProfileSummaryCard displayName={displayName} initials={initials} photoUrl="" identity={identity} creatorType={creatorType} creatorLocation={profile.city?.trim() || ''} primaryNiche={primaryNiche} otherNiches={otherNiches} formats={formats} styles={styles} hasContent={hasContent} /></div>
+      <div className="mt-3 px-7 sm:px-9"><ProfileSummaryCard displayName={displayName} initials={initials} photoUrl={photoUrl} identity={identity} creatorType={creatorType} creatorLocation={profile.city?.trim() || ''} primaryNiche={primaryNiche} otherNiches={otherNiches} formats={formats} styles={styles} hasContent={hasContent} /></div>
       <div className="px-7 sm:px-9"><ProfileSection><SectionHeading eyebrow="Social Presence" title="Where I create" editLabel="" /><div className="mt-7 grid gap-5 min-[1200px]:grid-cols-[minmax(0,1.65fr)_minmax(430px,1fr)] min-[1200px]:items-stretch"><div className="min-w-0">{socialAccounts.length ? primarySocialAccount ? <div className="flex flex-col gap-4"><PrimaryPlatformCard account={primarySocialAccount} portfolio={portfolio} />{secondarySocialAccounts.length ? <div className="grid auto-rows-fr gap-4 sm:grid-cols-2">{secondarySocialAccounts.map((account) => <CompactSecondaryPlatformCard key={account.id} account={account} />)}</div> : null}</div> : <div className="grid auto-rows-fr gap-4 sm:grid-cols-2">{socialAccounts.map((account) => <CompactSecondaryPlatformCard key={account.id} account={account} />)}</div> : <p className="text-sm leading-6 text-[#686270]">Social platforms have not been added yet.</p>}</div><AudiencePanel account={primarySocialAccount} /></div></ProfileSection></div>
     </div>
   </main>;
