@@ -153,6 +153,7 @@ export function CreatorSignupPage() {
         email: values.email.trim().toLowerCase(),
         password: values.password,
         options: {
+          emailRedirectTo: `${window.location.origin}/signin`,
           data: {
             full_name: values.fullName.trim(),
             phone_number: values.phone.trim(),

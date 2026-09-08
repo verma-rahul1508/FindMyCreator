@@ -15,6 +15,9 @@ type BasicInformation = {
   more: string | null;
 };
 
+type CreatorBasicInformation = BasicInformation & { id: string };
+type CreatorIdentityName = { display_name: string | null };
+
 type EditableBasicInformation = Pick<BasicInformation, 'full_name' | 'phone_number' | 'current_city' | 'date_of_birth' | 'gender'> & {
   more: string;
 };
@@ -50,6 +53,9 @@ export default function BasicInformationPage() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [values, setValues] = useState<EditableBasicInformation>(emptyValues);
+  const [creatorId, setCreatorId] = useState('');
+  const [identityExists, setIdentityExists] = useState(false);
+  const [loadedName, setLoadedName] = useState('');
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [saveError, setSaveError] = useState('');
@@ -72,7 +78,7 @@ export default function BasicInformationPage() {
 
     const { data, error } = await supabase
       .from('creators')
-      .select('full_name, email, phone_number, current_city, date_of_birth, gender, more')
+      .select('id, full_name, email, phone_number, current_city, date_of_birth, gender, more')
       .eq('auth_user_id', userData.user.id)
       .maybeSingle();
 
@@ -82,10 +88,27 @@ export default function BasicInformationPage() {
       return;
     }
 
-    const basicInformation = data as BasicInformation;
+    const basicInformation = data as CreatorBasicInformation;
+    const { data: identityData, error: identityError } = await supabase
+      .from('creator_identity')
+      .select('display_name')
+      .eq('creator_id', basicInformation.id)
+      .maybeSingle();
+
+    if (identityError) {
+      setLoadError('Your basic information could not be loaded.');
+      setLoading(false);
+      return;
+    }
+
+    const identity = identityData as CreatorIdentityName | null;
+    const currentName = identity?.display_name?.trim() || basicInformation.full_name || '';
     setEmail(userData.user.email || basicInformation.email || '');
+    setCreatorId(basicInformation.id);
+    setIdentityExists(Boolean(identity));
+    setLoadedName(currentName);
     setValues({
-      full_name: basicInformation.full_name || '',
+      full_name: currentName,
       phone_number: basicInformation.phone_number || '',
       current_city: basicInformation.current_city || '',
       date_of_birth: basicInformation.date_of_birth || '',
@@ -121,7 +144,7 @@ export default function BasicInformationPage() {
       return;
     }
 
-    const { error } = await supabase
+    const { error: creatorError } = await supabase
       .from('creators')
       .update({
         full_name: values.full_name.trim(),
@@ -133,10 +156,23 @@ export default function BasicInformationPage() {
       })
       .eq('auth_user_id', userData.user.id);
 
-    if (error) {
+    if (creatorError) {
       setSaveError('We could not save your basic information. Please try again.');
       setSaving(false);
       return;
+    }
+
+    if (identityExists && creatorId && values.full_name.trim() !== loadedName) {
+      const { error: identityError } = await supabase
+        .from('creator_identity')
+        .update({ display_name: values.full_name.trim() })
+        .eq('creator_id', creatorId);
+
+      if (identityError) {
+        setSaveError('We could not save your basic information. Please try again.');
+        setSaving(false);
+        return;
+      }
     }
 
     router.push('/profile');
