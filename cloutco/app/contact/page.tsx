@@ -12,11 +12,11 @@ export const metadata: Metadata = {
 export default function ContactRoutePage() {
   return (
     <div className="min-h-screen bg-[#fffdfc] text-black">
-      <SiteHeader />
+      <SiteHeader variant="actions" />
       <main>
         <ContactPage />
       </main>
-      <SiteFooter />
+      <SiteFooter variant="public" />
     </div>
   );
 }

@@ -1,9 +1,15 @@
+import { CloutCoLogo } from '@/components/cloutco-logo';
+
 const creatorLinks = [
   'How It Works',
   'Create Profile',
   'Opportunities',
   'Creator Resources',
   'Help Center',
+];
+const publicCreatorLinks = [
+  { label: 'Creator Profile', href: '/profile' },
+  { label: 'Contact Us', href: '/contact' },
 ];
 
 const brandLinks = ['Post a Campaign', 'How It Works', 'Find Creators', 'Brand Resources'];
@@ -79,21 +85,21 @@ function NavColumn({ title, links }: { title: string; links: Array<string | { la
   );
 }
 
-export function SiteFooter() {
+export function SiteFooter({ variant = 'default' }: { variant?: 'default' | 'public' }) {
+  const isPublicFooter = variant === 'public';
+
   return (
     <footer className="border-t border-[#cfe0ff]/80 bg-[#fffdfc]">
       <div className="mx-auto max-w-[1440px] px-5 pb-7 pt-9 sm:px-8 lg:px-12 xl:px-16">
-        <div className="grid gap-10 pb-10 pt-6 lg:grid-cols-[1.1fr_2.1fr] lg:gap-14">
+        <div className={`grid gap-10 pb-10 pt-6 lg:gap-14 ${isPublicFooter ? 'lg:grid-cols-[1.1fr_0.9fr]' : 'lg:grid-cols-[1.1fr_2.1fr]'}`}>
           <div className="max-w-[420px]">
-            <div className="text-[2.3rem] font-semibold tracking-[-0.08em] text-black leading-none sm:text-[2.8rem]">
-              Clout<span className="text-[#7c6ae7]">Co</span>
-            </div>
+            <CloutCoLogo className="h-12 sm:h-14" />
 
             <p className="mt-7 text-[1.05rem] leading-8 tracking-[-0.025em] text-[#404a5d]">
               CloutCo is a marketplace that connects creators with brands for high-impact collaborations.
             </p>
 
-            <div className="mt-8 flex items-center gap-3">
+            {!isPublicFooter && <div className="mt-8 flex items-center gap-3">
               {socialLinks.map(({ label, icon }) => (
                 <a
                   key={label}
@@ -104,19 +110,29 @@ export function SiteFooter() {
                   <SocialIcon type={icon} />
                 </a>
               ))}
-            </div>
+            </div>}
           </div>
 
-          <div className="grid gap-8 sm:grid-cols-2 xl:grid-cols-4">
-            <NavColumn title="For Creators" links={creatorLinks} />
-            <NavColumn title="For Brands" links={brandLinks} />
-            <NavColumn title="Company" links={companyLinks} />
-            <NavColumn title="Legal" links={legalLinks} />
+          <div className={`grid gap-8 ${isPublicFooter ? 'max-w-[220px]' : 'sm:grid-cols-2 xl:grid-cols-4'}`}>
+            <NavColumn title="For Creators" links={isPublicFooter ? publicCreatorLinks : creatorLinks} />
+            {!isPublicFooter && <NavColumn title="For Brands" links={brandLinks} />}
+            {!isPublicFooter && <NavColumn title="Company" links={companyLinks} />}
+            {!isPublicFooter && <NavColumn title="Legal" links={legalLinks} />}
           </div>
         </div>
 
         <div className="border-t border-[#cfdae8] pt-6">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          {isPublicFooter ? (
+            <div className="flex justify-center text-[0.98rem] font-medium tracking-[-0.02em] text-black md:justify-start md:text-[1.05rem]">
+              <span className="grid h-8 w-8 place-items-center rounded-full bg-[#efe7ff] text-[#6b30ee]">
+                <svg viewBox="0 0 24 24" aria-hidden="true" className="h-4 w-4 fill-current">
+                  <path d="M12 20.6c-4.15 0-7.5-3.34-7.5-7.49S7.85 5.62 12 5.62c4.16 0 7.5 3.35 7.5 7.49 0 4.15-3.34 7.49-7.5 7.49Zm0-1.65a5.84 5.84 0 1 0 0-11.68 5.84 5.84 0 0 0 0 11.68Zm-1.22-3.16-.92-2.49H8.5l2.76-7.18h2.18l2.76 7.2H13.5l-.87 2.47h-2.85Zm1.62-4.52-.68 1.89h1.3l-.62-1.89Z" />
+                </svg>
+              </span>
+              <span className="ml-2">Built for creators.</span>
+              <span className="ml-1 text-[#6b30ee]">Backed by brands.</span>
+            </div>
+          ) : <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div className="text-[0.98rem] tracking-[-0.02em] text-[#444d5e]">
               © 2025 CloutCo. All rights reserved.
             </div>
@@ -146,7 +162,7 @@ export function SiteFooter() {
                 </svg>
               </button>
             </div>
-          </div>
+          </div>}
         </div>
       </div>
     </footer>

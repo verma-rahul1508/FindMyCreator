@@ -117,7 +117,7 @@ export default function DashboardPage() {
 
   return <main className="min-h-screen bg-[#fbfaff] text-[#151518]">
     <header className="flex h-[78px] items-center justify-between border-b border-[#e8e7eb] bg-white px-5 sm:px-8 lg:px-10">
-      <AuthAwareLogo className="text-[1.5rem] font-semibold tracking-[-0.08em] text-black sm:text-[1.8rem]">CLOUTCO<span className="text-[#6330dc]">.</span></AuthAwareLogo>
+      <AuthAwareLogo className="text-[1.5rem] font-semibold tracking-[-0.08em] text-black sm:text-[1.8rem]" />
       <div className="flex items-center gap-4 sm:gap-6"><button type="button" className="text-[#525966]" aria-label="Notifications"><Icon name="bell" /></button><CreatorMobileNavigation currentPage="dashboard" additionalItems={[{ label: 'Messages', href: '#next-steps' }, { label: 'Settings', href: '#account' }]} /><AuthenticatedCreatorHeaderIdentity variant="menu" menuShadowClassName="shadow-lg" /></div>
     </header>
 

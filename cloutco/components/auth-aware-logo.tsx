@@ -2,16 +2,15 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState, type MouseEvent, type ReactNode } from 'react';
+import { useState, type MouseEvent } from 'react';
 import { getSupabaseClient } from '@/lib/supabase/client';
 
 type AuthAwareLogoProps = {
-  children: ReactNode;
   className?: string;
   ariaLabel?: string;
 };
 
-export function AuthAwareLogo({ children, className, ariaLabel }: AuthAwareLogoProps) {
+export function AuthAwareLogo({ className, ariaLabel }: AuthAwareLogoProps) {
   const router = useRouter();
   const [isResolvingDestination, setIsResolvingDestination] = useState(false);
 
@@ -38,11 +37,14 @@ export function AuthAwareLogo({ children, className, ariaLabel }: AuthAwareLogoP
     <Link
       href="/"
       onClick={(event) => void navigateToCurrentUserHome(event)}
-      className={className}
+      className={`inline-flex shrink-0 items-center transition-opacity hover:opacity-75 ${className ?? ''}`}
       aria-label={ariaLabel}
       aria-busy={isResolvingDestination || undefined}
     >
-      {children}
+      <span className="inline-flex items-baseline font-sans text-[19px] font-bold leading-none tracking-[-0.045em] sm:text-[20px]">
+        <span className="text-[#0F172A]">Clout</span>
+        <span className="text-[#7C3AED]">Co</span>
+      </span>
     </Link>
   );
 }

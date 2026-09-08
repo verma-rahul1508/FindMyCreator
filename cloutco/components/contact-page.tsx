@@ -24,7 +24,9 @@ const initialValues: FormValues = {
 export function ContactPage() {
   const [values, setValues] = useState<FormValues>(initialValues);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [submissionError, setSubmissionError] = useState('');
 
   const errors = useMemo(() => {
     const nextErrors: Partial<Record<keyof FormValues, string>> = {};
@@ -56,13 +58,18 @@ export function ContactPage() {
 
   const handleChange = (field: keyof FormValues, value: string) => {
     setValues((current) => ({ ...current, [field]: value }));
+    setSubmitted(false);
     if (touched[field]) {
       setTouched((current) => ({ ...current, [field]: true }));
     }
   };
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (isSubmitting) return;
+
+    setSubmissionError('');
+    setSubmitted(false);
 
     setTouched({
       fullName: true,
@@ -76,7 +83,27 @@ export function ContactPage() {
       return;
     }
 
-    setSubmitted(true);
+    setIsSubmitting(true);
+
+    try {
+      const result = await fetch('/api/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(values),
+      });
+
+      if (!result.ok) {
+        throw new Error('Contact email delivery failed.');
+      }
+
+      setValues(initialValues);
+      setTouched({});
+      setSubmitted(true);
+    } catch {
+      setSubmissionError("We couldn't send your message right now. Please email us directly at connect@cloutco.in.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const showError = (field: keyof FormValues) => Boolean(touched[field] && errors[field]);
@@ -105,7 +132,7 @@ export function ContactPage() {
               </span>
               <div>
                 <span className="font-medium">Email</span>
-                <div className="text-[#4b5364]">hello@cloutco.in</div>
+                <div className="text-[#4b5364]">connect@cloutco.in</div>
               </div>
             </div>
 
@@ -255,9 +282,10 @@ export function ContactPage() {
 
             <button
               type="submit"
-              className="inline-flex w-full items-center justify-center rounded-xl bg-gradient-to-r from-[#5d2adf] to-[#7f5ae6] px-6 py-3.5 text-base font-medium text-white shadow-[0_12px_24px_rgba(94,42,223,0.22)] transition hover:brightness-105"
+              disabled={isSubmitting}
+              className="inline-flex w-full items-center justify-center rounded-xl bg-gradient-to-r from-[#5d2adf] to-[#7f5ae6] px-6 py-3.5 text-base font-medium text-white shadow-[0_12px_24px_rgba(94,42,223,0.22)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-70"
             >
-              Send Message <span className="ml-2 text-lg">→</span>
+              {isSubmitting ? 'Sending…' : <>Send Message <span className="ml-2 text-lg">→</span></>}
             </button>
 
             <div className="flex items-center justify-center gap-2 pt-1 text-center text-sm text-[#49566a]">
@@ -265,9 +293,15 @@ export function ContactPage() {
               We respect your privacy. Your information will never be shared.
             </div>
 
+            {submissionError && (
+              <div className="rounded-xl border border-[#f1d1d1] bg-[#fff7f7] px-3 py-2 text-sm text-[#a12c2c]" role="alert">
+                {submissionError}
+              </div>
+            )}
+
             {submitted && (
-              <div className="rounded-xl border border-[#dfe7ff] bg-[#f4f8ff] px-3 py-2 text-sm text-[#1f5c4a]">
-                Your message has been drafted successfully. Connect this form to a real email service when you are ready.
+              <div className="rounded-xl border border-[#d8eadf] bg-[#f5fbf7] px-3 py-2 text-sm text-[#1f5c4a]" role="status">
+                Your message has been sent. We&apos;ll get back to you soon.
               </div>
             )}
           </form>

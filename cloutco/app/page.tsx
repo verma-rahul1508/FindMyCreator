@@ -15,7 +15,7 @@ export default function Home() {
         <CreatorProfileSection />
         <CreatorFinalCta />
       </main>
-      <SiteFooter />
+      <SiteFooter variant="public" />
     </div>
   );
 }

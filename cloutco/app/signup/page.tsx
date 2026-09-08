@@ -12,11 +12,11 @@ export const metadata: Metadata = {
 export default function SignupPage() {
   return (
     <div className="min-h-screen bg-[#fffdfc] text-black">
-      <SiteHeader />
+      <SiteHeader variant="actions" />
       <main>
         <CreatorSignupPage />
       </main>
-      <SiteFooter />
+      <SiteFooter variant="public" />
     </div>
   );
 }

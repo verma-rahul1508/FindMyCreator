@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 620 168" role="img" aria-labelledby="title desc">
+  <title id="title">CloutCo</title>
+  <desc id="desc">CloutCo — Create Collaborate Grow</desc>
+  <defs>
+    <linearGradient id="cloutco-gradient" x1="20" y1="17" x2="108" y2="111" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#A78BFA"/>
+      <stop offset=".34" stop-color="#7C3AED"/>
+      <stop offset=".7" stop-color="#5B32E7"/>
+      <stop offset="1" stop-color="#6366F1"/>
+    </linearGradient>
+  </defs>
+  <image href="cloutco-mark.svg" x="16" y="16" width="128" height="128"/>
+  <text x="166" y="91" fill="#0F172A" font-family="Inter, Arial, sans-serif" font-size="76" font-weight="750" letter-spacing="-5">Clout</text>
+  <text x="377" y="91" fill="url(#cloutco-gradient)" font-family="Inter, Arial, sans-serif" font-size="76" font-weight="750" letter-spacing="-5">Co</text>
+  <text x="171" y="122" fill="#64748B" font-family="Inter, Arial, sans-serif" font-size="12" font-weight="700" letter-spacing="5">CREATE COLLABORATE GROW</text>
+</svg>

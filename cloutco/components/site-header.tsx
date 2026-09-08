@@ -9,8 +9,9 @@ const navItems = [
   { label: 'How It Works', href: '#how-it-works' },
 ];
 
-export function SiteHeader() {
+export function SiteHeader({ variant = 'default' }: { variant?: 'default' | 'actions' }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const hasNavigation = variant === 'default';
 
   const handleNavClick = (
     event: React.MouseEvent<HTMLAnchorElement>,
@@ -30,13 +31,9 @@ export function SiteHeader() {
   return (
     <header className="sticky top-0 z-50 border-b border-black/5 bg-[#fffdfc]/90 backdrop-blur-sm">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
-        <AuthAwareLogo className="flex items-center" ariaLabel="CloutCo home">
-          <span className="text-[1.5rem] font-semibold tracking-[-0.08em] text-black sm:text-[1.75rem]">
-            Clout<span className="text-[#7c6ae7]">Co</span>
-          </span>
-        </AuthAwareLogo>
+        <AuthAwareLogo className="flex items-center" ariaLabel="CloutCo home" />
 
-        <nav className="hidden items-center gap-8 md:flex" aria-label="Main navigation">
+        {hasNavigation && <nav className="hidden items-center gap-8 md:flex" aria-label="Main navigation">
           {navItems.map((item) => (
             <a
               key={item.label}
@@ -47,7 +44,7 @@ export function SiteHeader() {
               {item.label}
             </a>
           ))}
-        </nav>
+        </nav>}
 
         <div className="hidden items-center gap-3 md:flex">
           <Link
@@ -95,7 +92,7 @@ export function SiteHeader() {
       {isMenuOpen && (
         <div className="border-t border-black/5 bg-white md:hidden">
           <nav className="mx-auto flex max-w-7xl flex-col gap-2 px-4 py-4" aria-label="Mobile navigation">
-            {navItems.map((item) => (
+            {hasNavigation && navItems.map((item) => (
               <a
                 key={item.label}
                 href={item.href}
@@ -106,7 +103,7 @@ export function SiteHeader() {
               </a>
             ))}
 
-            <div className="mt-2 grid gap-2">
+            <div className={`${hasNavigation ? 'mt-2 ' : ''}grid gap-2`}>
               <Link
                 href="/signin"
                 className="inline-flex min-h-11 items-center justify-center rounded-full border border-black/10 bg-white px-4 text-sm font-medium text-black transition-colors hover:border-black/20 hover:bg-[#f7f3ff]"

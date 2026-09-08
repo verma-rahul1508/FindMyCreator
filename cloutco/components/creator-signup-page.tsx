@@ -282,7 +282,7 @@ export function CreatorSignupPage() {
                 </svg>
               </span>
               <h3 className="mt-6 text-[2rem] font-semibold tracking-[-0.05em] text-black sm:text-[2.25rem]">Check your email to continue</h3>
-              <p className="mt-3 max-w-md text-base leading-7 text-[#4d5667]">We&apos;ve sent a verification link to your email address. Please verify your email to continue to CloutCo.</p>
+              <p className="mt-3 max-w-md text-base leading-7 text-[#4d5667]">We’ve sent a verification link to your email address. Please verify your email to continue to CloutCo.</p>
               <p className="mt-3 max-w-md text-sm leading-6 text-[#667189]">Once your email is verified, you can sign in to your account.</p>
               <Link href="/signin" className="mt-8 inline-flex min-h-12 items-center justify-center rounded-xl bg-gradient-to-r from-[#5d2adf] to-[#7a58ea] px-6 text-base font-medium text-white shadow-[0_12px_24px_rgba(94,42,223,0.2)] transition hover:brightness-105">Go to Sign In <span aria-hidden="true" className="ml-2 text-lg">&rarr;</span></Link>
             </section>

@@ -123,9 +123,7 @@ export default function SigninPage() {
     <main className="min-h-screen bg-[#fdfcfe] px-2 py-2 sm:px-4 sm:py-4 lg:px-8 lg:py-8">
       <div className="relative mx-auto min-h-[calc(100vh-4rem)] max-w-[1440px] overflow-hidden rounded-[9px] border border-[#e6e7ec] bg-white shadow-[0_14px_45px_rgba(43,34,71,0.06)]">
         <header className="flex items-center justify-between border-b border-[#e4e5e9] px-6 py-5 sm:px-9 sm:py-6 lg:px-10">
-          <AuthAwareLogo className="text-[1.5rem] font-semibold tracking-[-0.08em] text-black sm:text-[1.75rem]">
-            CLOUTCO<span className="text-[#6330dc]">.</span>
-          </AuthAwareLogo>
+          <AuthAwareLogo className="text-[1.5rem] font-semibold tracking-[-0.08em] text-black sm:text-[1.75rem]" />
           <p className="text-sm text-[#17171a] sm:text-[0.95rem]">
             New to CloutCo?{' '}
             <Link href="/signup" className="font-medium text-[#5f2ad7] hover:underline">Join as a Creator</Link>
