@@ -33,7 +33,7 @@ const steps: JourneyStep[] = [
   {
     number: '04',
     title: 'Grow with CloutCo',
-    description: 'Build your portfolio, work with brands and unlock better opportunities over time.',
+    description: 'Build your creator presence, work with brands and unlock better opportunities over time.',
     image: '/images/journey-grow.png',
     imageAlt: 'Creator recording a podcast',
   },

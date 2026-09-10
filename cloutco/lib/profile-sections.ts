@@ -3,7 +3,6 @@ export const profileSectionKeys = [
   'creator-identity',
   'content-and-niche',
   'social-platforms',
-  'portfolio',
 ] as const;
 
 export type ProfileSectionKey = (typeof profileSectionKeys)[number];
@@ -20,7 +19,6 @@ export const profileSections: ProfileSection[] = [
   { key: 'creator-identity', title: 'Creator Identity', route: '/profile/identity', required: true },
   { key: 'content-and-niche', title: 'Content & Niche', route: '/profile/content', required: true },
   { key: 'social-platforms', title: 'Social Platforms', route: '/profile/social', required: true },
-  { key: 'portfolio', title: 'Portfolio', route: '/profile/portfolio', required: true },
 ];
 
 export function getNextProfileRoute(completedSections: Partial<Record<ProfileSectionKey | string, boolean>>) {

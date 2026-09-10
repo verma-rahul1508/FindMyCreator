@@ -27,12 +27,13 @@ function CityPicker({ selected, onChange }: { selected: string[]; onChange: (cit
   const [cities, setCities] = useState<City[] | null>(null);
 
   useEffect(() => {
-    if (!isOpen || cities) return;
-    void import('country-state-city').then(({ City, State }) => {
-      const states = new Map((State.getStatesOfCountry('IN') || []).map((state) => [state.isoCode, state.name]));
-      setCities((City.getCitiesOfCountry('IN') || []).map((city) => ({ value: city.name, detail: states.get(city.stateCode) || city.stateCode || 'India' })));
-    });
-  }, [cities, isOpen]);
+    void import('country-state-city')
+      .then(({ City, State }) => {
+        const states = new Map((State.getStatesOfCountry('IN') || []).map((state) => [state.isoCode, state.name]));
+        setCities((City.getCitiesOfCountry('IN') || []).map((city) => ({ value: city.name, detail: states.get(city.stateCode) || city.stateCode || 'India' })));
+      })
+      .catch(() => setCities([]));
+  }, []);
 
   const options = useMemo(() => {
     const query = value.trim().toLocaleLowerCase('en-IN');
@@ -53,7 +54,7 @@ function CityPicker({ selected, onChange }: { selected: string[]; onChange: (cit
 
   return <div>
     <div className="flex flex-wrap gap-2">{selected.map((city) => <span key={city} className="inline-flex items-center gap-1.5 rounded-full bg-[#f0eaff] px-3 py-1.5 text-sm font-medium text-[#5124b9]">{city}<button type="button" onClick={() => onChange(selected.filter((item) => item !== city))} aria-label={`Remove ${city}`} className="text-[#5124b9] hover:opacity-60">×</button></span>)}</div>
-    {selected.length < 5 && <div className="relative mt-2"><input value={value} onFocus={() => setIsOpen(true)} onBlur={() => window.setTimeout(() => setIsOpen(false), 150)} onChange={(event) => setValue(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); add(value); } }} placeholder="Search or add a city / town" autoComplete="off" className="min-h-11 w-full rounded-lg border border-[#dfe1e8] px-3.5 text-sm outline-none focus:border-[#8760df]" />{isOpen && value.trim() && <div className="absolute left-0 top-full z-30 mt-1 max-h-52 w-full overflow-y-auto rounded-lg border border-[#ded7eb] bg-white p-1 shadow-[0_10px_24px_rgba(54,38,90,0.14)]">{options.length ? options.map((city) => <button key={`${city.value}-${city.detail || ''}`} type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => add(city.value)} className="block w-full rounded-md px-3 py-2 text-left text-sm hover:bg-[#f5f1ff]"><span className="block font-medium">{city.value}</span>{city.detail && <span className="block text-xs text-[#71798a]">{city.detail}</span>}</button>) : <button type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => add(value)} className="block w-full rounded-md px-3 py-2 text-left text-sm hover:bg-[#f5f1ff]">Add “{value.trim()}”</button>}</div>}</div>}
+    {selected.length < 5 && <div className="relative mt-2"><input value={value} onFocus={() => setIsOpen(true)} onBlur={() => window.setTimeout(() => setIsOpen(false), 150)} onChange={(event) => setValue(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); add(value); } }} placeholder="Search or add a city / town" autoComplete="off" className="min-h-11 w-full rounded-lg border border-[#dfe1e8] px-3.5 text-sm outline-none focus:border-[#8760df]" />{isOpen && value.trim() && <div className="absolute left-0 top-full z-30 mt-1 max-h-52 w-full overflow-y-auto rounded-lg border border-[#ded7eb] bg-white p-1 shadow-[0_10px_24px_rgba(54,38,90,0.14)]">{cities === null ? <p className="px-3 py-2 text-sm text-[#71798a]">Loading city suggestions…</p> : options.length ? options.map((city) => <button key={`${city.value}-${city.detail || ''}`} type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => add(city.value)} className="block w-full rounded-md px-3 py-2 text-left text-sm hover:bg-[#f5f1ff]"><span className="block font-medium">{city.value}</span>{city.detail && <span className="block text-xs text-[#71798a]">{city.detail}</span>}</button>) : <button type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => add(value)} className="block w-full rounded-md px-3 py-2 text-left text-sm hover:bg-[#f5f1ff]">Add “{value.trim()}”</button>}</div>}</div>}
     <p className="mt-2 text-xs text-[#747b89]">Select up to 5 cities or towns.</p>
   </div>;
 }

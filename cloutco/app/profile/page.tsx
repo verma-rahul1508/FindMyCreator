@@ -12,6 +12,7 @@ import { loadCreatorProfileProgress, type CreatorProfileProgress } from '@/lib/p
 import type { ProfileSectionKey } from '@/lib/profile-sections';
 import { loadSocialAccounts } from '@/lib/social-platform-persistence';
 import { formatPlatformCount } from '@/lib/format-number';
+import { ProfilePhotoEditor } from '@/components/profile-photo-editor';
 
 type Creator = { id: string; public_profile_id: string; full_name: string; email: string; phone_number: string; current_city: string; date_of_birth: string; gender: string; status: string; created_at: string };
 type Identity = { profile_photo_url: string | null; display_name: string | null; username: string | null; creator_type: string | null; creator_type_other: string | null };
@@ -30,12 +31,14 @@ type SocialAccount = {
       views: string;
       interactions: string;
       netFollowers: string;
+      viewersTotal: string;
     };
   };
   facebookInsights?: {
     period: string;
     overview: {
       viewsTotal: string;
+      viewers: string;
     };
     engagement: {
       total: string;
@@ -58,7 +61,7 @@ type SocialAccount = {
 type InsightIcon = 'eye' | 'heart' | 'users' | 'trend' | 'pin';
 type InsightCard = { label: string; value: string; icon: InsightIcon; textValue?: boolean };
 const definedInsightCards = (cards: Array<InsightCard | null>) => cards.filter((card): card is InsightCard => card !== null);
-type IconName = 'home' | 'user' | 'check' | 'message' | 'settings' | 'bell' | 'chevron' | 'arrow' | 'spark' | 'document' | 'shield' | 'identity' | 'content' | 'social' | 'portfolio' | 'flip' | 'share' | 'pin' | InsightIcon;
+type IconName = 'home' | 'user' | 'check' | 'message' | 'settings' | 'bell' | 'chevron' | 'arrow' | 'spark' | 'document' | 'shield' | 'identity' | 'content' | 'social' | 'flip' | 'share' | 'pin' | InsightIcon;
 
 const creatorFields = 'id, public_profile_id, full_name, email, phone_number, current_city, date_of_birth, gender, status, created_at';
 const reasons = ['Build a stronger professional presence', 'Help CloutCo understand your content', 'Make your creator profile more complete', 'Showcase your work professionally'];
@@ -69,7 +72,6 @@ const sectionPresentation: Record<ProfileSectionKey, { description: string; icon
   'creator-identity': { description: 'Add your photo, username, bio and languages', icon: 'identity' },
   'content-and-niche': { description: 'Tell us what you create and your niche', icon: 'content' },
   'social-platforms': { description: 'Connect your social media accounts', icon: 'social' },
-  portfolio: { description: 'Showcase your best work', icon: 'portfolio' },
 };
 
 function Icon({ name }: { name: IconName }) {
@@ -88,7 +90,6 @@ function Icon({ name }: { name: IconName }) {
     identity: <><circle cx="12" cy="8" r="2.5" /><path d="M7.5 18c.5-2.5 2-4 4.5-4s4 1.5 4.5 4" /></>,
     content: <><rect x="4" y="4" width="6" height="6" rx="1" /><rect x="14" y="4" width="6" height="6" rx="1" /><rect x="4" y="14" width="6" height="6" rx="1" /><rect x="14" y="14" width="6" height="6" rx="1" /></>,
     social: <><rect x="5" y="4" width="14" height="16" rx="2" /><path d="M8 8h8M8 12h8M8 16h5" /></>,
-    portfolio: <><path d="M4 7.5h16v12H4zM8 7.5V5h8v2.5M4 12h16" /></>,
     flip: <><path d="M19 9.5A7.5 7.5 0 1 0 20 15" /><path d="M19 4.5v5h-5" /></>,
     share: <><circle cx="18" cy="5" r="2.25" /><circle cx="6" cy="12" r="2.25" /><circle cx="18" cy="19" r="2.25" /><path d="m8 11 7.8-4.8M8 13l7.8 4.8" /></>,
     pin: <><path d="M19 10.5c0 4.5-7 9.5-7 9.5s-7-5-7-9.5a7 7 0 1 1 14 0Z" /><circle cx="12" cy="10.5" r="2.25" /></>,
@@ -124,7 +125,7 @@ function CreatorCardAction({ icon, label, onClick, filled = false }: { icon: 'fl
 function LoadingState() { return <main className="grid min-h-screen place-items-center bg-[#fbfaff] text-sm text-[#5b6272]">Loading your creator profile...</main>; }
 function ErrorState({ retry }: { retry: () => void }) { return <main className="grid min-h-screen place-items-center bg-[#fbfaff] px-6 text-center"><div className="max-w-md rounded-2xl border border-[#e8e4f1] bg-white p-8 shadow-[0_12px_30px_rgba(70,48,112,0.05)]"><div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-[#f1ebff] text-[#6330dc]"><Icon name="document" /></div><h1 className="mt-5 text-2xl font-semibold tracking-[-0.05em] text-black">We couldn&apos;t load your profile</h1><p className="mt-3 text-sm leading-6 text-[#626a7a]">Please try again. Your profile information has not been changed.</p><button type="button" onClick={retry} className="mt-6 rounded-lg bg-black px-5 py-3 text-sm font-medium text-white">Try again</button></div></main>; }
 
-function CreatorCard({ creator, identity, content, photoUrl, socialAccounts, initials, allRequiredComplete }: { creator: Creator; identity: Identity | null; content: ContentProfile | null; photoUrl: string; socialAccounts: SocialAccount[]; initials: string; allRequiredComplete: boolean }) {
+function CreatorCard({ creator, identity, content, photoUrl, socialAccounts, initials, allRequiredComplete, onPhotoUpdated }: { creator: Creator; identity: Identity | null; content: ContentProfile | null; photoUrl: string; socialAccounts: SocialAccount[]; initials: string; allRequiredComplete: boolean; onPhotoUpdated: (photoUrl: string) => void }) {
   const [isFlipped, setIsFlipped] = useState(false);
   const [reducedMotion, setReducedMotion] = useState(false);
   const [shareStatus, setShareStatus] = useState('');
@@ -143,33 +144,39 @@ function CreatorCard({ creator, identity, content, photoUrl, socialAccounts, ini
   const instagramPeriod = primaryInstagramAccount?.instagramInsights?.period.trim() || '';
   const facebookPeriod = primaryFacebookAccount?.facebookInsights?.period.trim() || '';
   const instagramInsightCards = definedInsightCards([
+    instagramPeriod && primaryInstagramAccount?.instagramInsights?.overview.viewersTotal.trim()
+      ? { label: 'Viewers', value: primaryInstagramAccount.instagramInsights.overview.viewersTotal, icon: 'users' as const }
+      : null,
     instagramPeriod && primaryInstagramAccount?.instagramInsights?.overview.views.trim()
-      ? { label: 'Last ' + instagramPeriod + ' days Views', value: primaryInstagramAccount.instagramInsights.overview.views, icon: 'eye' as const }
+      ? { label: 'Views', value: primaryInstagramAccount.instagramInsights.overview.views, icon: 'eye' as const }
       : null,
     instagramPeriod && primaryInstagramAccount?.instagramInsights?.overview.interactions.trim()
-      ? { label: 'Last ' + instagramPeriod + ' days Interactions', value: primaryInstagramAccount.instagramInsights.overview.interactions, icon: 'heart' as const }
-      : null,
-    primaryInstagramAccount?.audienceCount.trim()
-      ? { label: 'Followers', value: primaryInstagramAccount.audienceCount, icon: 'users' as const }
-      : null,
-    primaryInstagramAccount?.instagramInsights?.overview.netFollowers.trim()
-      ? { label: 'Net Followers', value: primaryInstagramAccount.instagramInsights.overview.netFollowers, icon: 'trend' as const }
+      ? { label: 'Interactions', value: primaryInstagramAccount.instagramInsights.overview.interactions, icon: 'heart' as const }
       : null,
   ]);
   const facebookTopAge = highestRankedAudienceLabel((primaryFacebookAccount?.facebookInsights?.audience.ageGroups || []).map((ageGroup) => ({ label: ageGroup.name, percentage: ageGroup.value })));
   const facebookTopCity = highestRankedAudienceLabel((primaryFacebookAccount?.facebookInsights?.audience.locations.cities || []).map((city) => ({ label: city.name, percentage: city.percentage })));
   const facebookInsightCards = definedInsightCards([
+    primaryFacebookAccount?.audienceCount.trim()
+      ? { label: 'Followers', value: primaryFacebookAccount.audienceCount, icon: 'users' as const }
+      : null,
     facebookPeriod && primaryFacebookAccount?.facebookInsights?.overview.viewsTotal.trim()
-      ? { label: 'Last ' + facebookPeriod + ' days Views', value: primaryFacebookAccount.facebookInsights.overview.viewsTotal, icon: 'eye' as const }
+      ? { label: 'Views', value: primaryFacebookAccount.facebookInsights.overview.viewsTotal, icon: 'eye' as const }
       : null,
     facebookPeriod && primaryFacebookAccount?.facebookInsights?.engagement.total.trim()
-      ? { label: 'Last ' + facebookPeriod + ' days Engagement', value: primaryFacebookAccount.facebookInsights.engagement.total, icon: 'heart' as const }
+      ? { label: 'Engagement', value: primaryFacebookAccount.facebookInsights.engagement.total, icon: 'heart' as const }
       : null,
     facebookTopAge
       ? { label: 'Top Age', value: facebookTopAge, icon: 'users' as const, textValue: true }
       : null,
     facebookTopCity
       ? { label: 'Top City', value: facebookTopCity, icon: 'pin' as const, textValue: true }
+      : null,
+    primaryFacebookAccount?.facebookInsights?.overview.viewers.trim()
+      ? { label: 'Viewers', value: primaryFacebookAccount.facebookInsights.overview.viewers, icon: 'users' as const }
+      : null,
+    primaryFacebookAccount?.facebookInsights?.audience.netFollowers.trim()
+      ? { label: 'Net Followers', value: primaryFacebookAccount.facebookInsights.audience.netFollowers, icon: 'trend' as const }
       : null,
   ]);
   const youtubeInsightCards = definedInsightCards([
@@ -237,9 +244,15 @@ function CreatorCard({ creator, identity, content, photoUrl, socialAccounts, ini
       <div className="absolute inset-0 [transform-style:preserve-3d]" style={{ transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)', transition }}>
         <article aria-label="Creator card front" className="absolute inset-0 isolate overflow-hidden rounded-[1.7rem] border border-[#ded3f6] bg-[linear-gradient(135deg,#ffffff_0%,#fdfbff_57%,#f4efff_100%)] shadow-[0_18px_42px_rgba(78,50,135,0.1)] [backface-visibility:hidden]">
           <div className="relative grid h-full grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] grid-rows-[220px_minmax(0,1fr)] sm:grid-cols-[170px_minmax(0,1fr)_190px] sm:grid-rows-1">
-            <div className="col-span-2 min-h-0 overflow-hidden bg-[#f1eaff] text-3xl font-semibold text-[#6731dc] sm:col-span-1">
-              {photoUrl ? <img src={photoUrl} alt={'Portrait of ' + displayName} className="h-full w-full object-cover object-center" /> : <div className="grid h-full w-full place-items-center bg-[linear-gradient(145deg,#f6f0ff_0%,#e6d8ff_100%)]">{initials}</div>}
-            </div>
+            <ProfilePhotoEditor
+              creatorId={creator.id}
+              photoUrl={photoUrl}
+              initials={initials}
+              alt={'Portrait of ' + displayName}
+              className="col-span-2 min-h-0 overflow-hidden bg-[#f1eaff] text-3xl font-semibold text-[#6731dc] sm:col-span-1"
+              fallbackClassName="grid h-full w-full place-items-center bg-[linear-gradient(145deg,#f6f0ff_0%,#e6d8ff_100%)]"
+              onPhotoUpdated={onPhotoUpdated}
+            />
             <div className="min-w-0 p-4 sm:p-5">
               <p className="text-[0.65rem] font-bold uppercase tracking-[0.2em] text-[#9b7cf4]">Creator</p>
               <h2 className="mt-2 break-words text-[1.65rem] font-semibold leading-[0.95] tracking-[-0.065em] text-[#15121b] sm:text-[2.05rem]">{displayName}</h2>
@@ -350,7 +363,7 @@ export default function ProfilePage() {
     <div className="mx-auto flex max-w-[1600px]">
       <aside className="hidden w-[230px] shrink-0 border-r border-[#e8e7eb] bg-white px-5 py-8 lg:block"><nav className="space-y-2" aria-label="Creator navigation"><Link href="/dashboard" className="flex items-center gap-3 rounded-xl px-4 py-3.5 text-sm text-[#424754] hover:bg-[#faf8ff]"><Icon name="home" />Dashboard</Link><a href="#profile-sections" className="flex items-center gap-3 rounded-xl bg-[#f1ebff] px-4 py-3.5 text-sm font-medium text-[#6330dc]"><Icon name="user" />My Profile</a><a href="#next-steps" className="flex items-center gap-3 rounded-xl px-4 py-3.5 text-sm text-[#424754] hover:bg-[#faf8ff]"><Icon name="message" />Messages</a><a href="#profile-status" className="flex items-center gap-3 rounded-xl px-4 py-3.5 text-sm text-[#424754] hover:bg-[#faf8ff]"><Icon name="settings" />Settings</a></nav><div className="mt-36 rounded-2xl border border-[#e8e0fa] bg-[#fbf9ff] p-5"><div className="grid h-9 w-9 place-items-center rounded-full border border-[#d9c8ff] text-[#6330dc]"><Icon name="spark" /></div><h2 className="mt-5 text-sm font-semibold">Complete your profile</h2><p className="mt-2 text-xs leading-5 text-[#626a7a]">Build your professional creator profile on CloutCo.</p><p className="mt-4 text-xs font-medium text-[#34363d]">{progress.completedCount} of {progress.requiredCount} sections completed</p><p className="mt-2 text-xs text-[#777e8d]">{nextSection ? 'Next: ' + nextSection.title : 'Required sections complete'}</p>{nextSection ? <Link href={nextProfileRoute} className="mt-5 flex items-center justify-center gap-2 rounded-lg border border-[#d3c1ff] px-3 py-2.5 text-xs font-medium text-[#6330dc]">Continue Profile <Icon name="arrow" /></Link> : <span className="mt-5 flex items-center justify-center rounded-lg border border-[#e2ddec] px-3 py-2.5 text-xs font-medium text-[#777e8d]">Required sections complete</span>}</div></aside>
       <div className="min-w-0 flex-1 px-5 py-9 sm:px-8 lg:px-12 lg:py-11">
-        <section className="grid w-full gap-8 xl:grid-cols-[minmax(280px,1fr)_minmax(0,600px)] xl:items-center xl:gap-8"><div><h1 className="text-[2.4rem] font-semibold tracking-[-0.065em] sm:text-[3rem]">My Profile</h1><p className="mt-4 max-w-[340px] text-sm leading-6 text-[#5d6575]">Your creator profile brings your identity, content, audience, and work together in one polished view.</p><p className="mt-3 max-w-[340px] text-xs leading-5 text-[#7a728d]">Keep your profile information up to date to ensure your Creator Card is accurate.</p><Link href="/profile/preview" className="mt-5 inline-flex min-h-11 items-center justify-center rounded-xl border border-[#d8c7fb] bg-[#f6f0ff] px-4 text-sm font-semibold text-[#6330dc] shadow-[0_6px_16px_rgba(99,48,220,0.12)] transition hover:border-[#c5afea] hover:bg-[#ede3ff]">Preview Profile <span aria-hidden="true" className="ml-2">&rarr;</span></Link></div><div className="w-full max-w-[600px] min-w-0 xl:mr-12 xl:justify-self-end"><CreatorCard creator={creator} identity={identity} content={content} photoUrl={profilePhotoUrl} socialAccounts={socialAccounts} initials={initials} allRequiredComplete={progress.allRequiredComplete} /></div></section>
+        <section className="grid w-full gap-8 xl:grid-cols-[minmax(280px,1fr)_minmax(0,600px)] xl:items-center xl:gap-8"><div><h1 className="text-[2.4rem] font-semibold tracking-[-0.065em] sm:text-[3rem]">My Profile</h1><p className="mt-4 max-w-[340px] text-sm leading-6 text-[#5d6575]">Your creator profile brings your identity, content, audience, and work together in one polished view.</p><p className="mt-3 max-w-[340px] text-xs leading-5 text-[#7a728d]">Keep your profile information up to date to ensure your Creator Card is accurate.</p><Link href="/profile/preview" className="mt-5 inline-flex min-h-11 items-center justify-center rounded-xl border border-[#d8c7fb] bg-[#f6f0ff] px-4 text-sm font-semibold text-[#6330dc] shadow-[0_6px_16px_rgba(99,48,220,0.12)] transition hover:border-[#c5afea] hover:bg-[#ede3ff]">Preview Profile <span aria-hidden="true" className="ml-2">&rarr;</span></Link></div><div className="w-full max-w-[600px] min-w-0 xl:mr-12 xl:justify-self-end"><CreatorCard creator={creator} identity={identity} content={content} photoUrl={profilePhotoUrl} socialAccounts={socialAccounts} initials={initials} allRequiredComplete={progress.allRequiredComplete} onPhotoUpdated={setProfilePhotoUrl} /></div></section>
         <div className="mt-8 grid gap-5 xl:grid-cols-[1.18fr_0.82fr]"><section className="rounded-2xl border border-[#e8e7eb] bg-white p-6 shadow-[0_7px_24px_rgba(50,40,80,0.035)] sm:p-7"><div className="flex items-start justify-between"><div><h2 className="text-lg font-semibold tracking-[-0.03em]">Profile setup progress</h2><p className="mt-2 text-sm text-[#626a7a]">{progress.completedCount} section{progress.completedCount === 1 ? '' : 's'} completed</p></div><span className="grid h-10 w-10 place-items-center rounded-full bg-[#f1ebff] text-[#7440f4]"><Icon name="document" /></span></div><div className="mt-7 flex items-center gap-4"><div className="h-2 flex-1 overflow-hidden rounded-full bg-[#eee9f9]"><div className={'h-full rounded-full ' + (isProfileComplete ? 'bg-[#13a34a]' : 'bg-[#7440f4]')} style={{ width: String(progressPercent) + '%' }} /></div><span className="whitespace-nowrap text-sm font-semibold text-[#6330dc]">{progress.completedCount} of {progress.requiredCount}</span></div><div className="mt-6 grid gap-4 border-t border-[#f0eff2] pt-5 sm:grid-cols-2"><div><p className="text-sm font-medium">Basic Information</p><p className="mt-1 text-xs text-[#777e8d]">{basicInformation?.completed ? 'Completed' : 'Not started'}</p><Link href="/profile/basic-information" className="mt-3 inline-flex text-xs font-semibold text-[#6330dc] hover:text-[#4720b2]">Edit Basic Information <span aria-hidden="true" className="ml-1">&rarr;</span></Link></div><div><p className="text-sm font-medium">{progress.requiredCount - progress.completedCount} sections remaining</p><p className="mt-1 text-xs text-[#777e8d]">Complete your professional profile step by step.</p></div></div></section><section id="profile-status" className="rounded-2xl border border-[#e8e7eb] bg-white p-6 shadow-[0_7px_24px_rgba(50,40,80,0.035)] sm:p-7"><div className="flex items-center justify-between"><h2 className="text-lg font-semibold tracking-[-0.03em]">Profile status</h2><span className="rounded-full bg-[#fff3d9] px-3 py-1 text-[0.65rem] font-bold uppercase tracking-wide text-[#a06900]">{status}</span></div><div className="mt-7 flex flex-col items-center text-center"><span className="grid h-14 w-14 place-items-center rounded-full bg-[#f1ebff] text-[#7440f4]"><Icon name="shield" /></span><h3 className="mt-4 text-sm font-semibold">{statusCopy}</h3><p className="mt-3 max-w-[230px] text-xs leading-5 text-[#656d7c]">Your basic details are saved in your CloutCo creator profile.</p></div></section></div>
         <section id="profile-sections" className="mt-5 rounded-2xl border border-[#e8e7eb] bg-white p-6 shadow-[0_7px_24px_rgba(50,40,80,0.035)] sm:p-7"><h2 className="text-lg font-semibold tracking-[-0.03em]">Profile sections</h2><p className="mt-2 text-sm text-[#626a7a]">Complete each section to build your professional creator profile.</p><div className="mt-6 space-y-2">{progress.sections.map((section) => { const presentation = sectionPresentation[section.key]; const row = <div className="flex items-center gap-4 rounded-xl border border-[#eeeef2] px-4 py-3.5 transition hover:border-[#ded3f7] hover:bg-[#fcfbff]"><span className={'grid h-10 w-10 shrink-0 place-items-center rounded-lg ' + (section.completed ? 'bg-[#eefbf2] text-[#13a34a]' : 'bg-[#f3edff] text-[#7440f4]')}><Icon name={section.completed ? 'check' : presentation.icon} /></span><span className="min-w-0 flex-1"><strong className="block text-sm font-semibold">{section.title}{section.required ? '' : ' (Optional)'}</strong><small className="mt-1 block text-xs text-[#777e8d]">{presentation.description}</small></span><span className={'hidden rounded-full px-3 py-1 text-[0.68rem] font-medium sm:block ' + (section.completed ? 'bg-[#eefbf2] text-[#21834a]' : 'bg-[#f5f0ff] text-[#7440f4]')}>{section.completed ? 'Completed' : section.required ? 'Not started' : 'Optional'}</span><span className="text-[#858b98]"><Icon name="chevron" /></span></div>; return section.route ? <Link key={section.key} href={section.route}>{row}</Link> : <div key={section.key} aria-disabled="true">{row}</div>; })}</div></section>
         <section id="next-steps" className="mt-5 rounded-2xl border border-[#e8e7eb] bg-white p-6 shadow-[0_7px_24px_rgba(50,40,80,0.035)] sm:p-7"><h2 className="text-lg font-semibold tracking-[-0.03em]">Why complete your profile?</h2><div className="mt-5 grid gap-3 sm:grid-cols-2">{reasons.map((reason) => <p key={reason} className="flex items-start gap-3 text-sm leading-5 text-[#4e5667]"><span className="mt-0.5 text-[#7440f4]"><Icon name="check" /></span>{reason}</p>)}</div><div className="mt-7 border-t border-[#f0eff2] pt-6"><div className="flex items-center justify-between gap-3"><h3 className="text-base font-semibold">Profile status</h3><span className="rounded-full bg-[#fff3d9] px-3 py-1 text-[0.65rem] font-bold uppercase tracking-wide text-[#a06900]">{status}</span></div><p className="mt-4 text-sm font-medium">{statusCopy}</p><p className="mt-2 text-sm leading-5 text-[#656d7c]">Your basic details are saved in your CloutCo creator profile.</p></div></section>

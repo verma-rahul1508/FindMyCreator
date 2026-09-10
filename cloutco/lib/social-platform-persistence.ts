@@ -1,88 +1,121 @@
 import { getSupabaseClient } from '@/lib/supabase/client';
 
 type Platform = 'Instagram' | 'Facebook' | 'YouTube';
-type Account = { id: string; platform: Platform; platformName: string; profileUrl: string; username: string; audienceCount: string; isPrimary: boolean; instagramInsights?: any; facebookInsights?: any; youtubeInsights?: any };
+type Account = { id: string; platform: Platform; platformName: string; profileUrl: string; username: string; audienceCount: string; isPrimary: boolean; instagramInsights?: unknown; facebookInsights?: unknown; youtubeInsights?: unknown };
+type PlatformRow = { id: string; platform: string; profile_url: string; username: string | null; audience_count: number | string; is_primary: boolean };
+type SnapshotRow = { id: string; social_platform_id: string; platform: string };
+type InstagramAnalyticsRow = { snapshot_id: string; views_all_content: number | string | null; net_followers: number | string | null; interactions: number | string | null; viewers_total: number | string | null; profile_visits: number | string | null; women_percentage: number | string | null; men_percentage: number | string | null };
+type FacebookAnalyticsRow = { snapshot_id: string; views_total: number | string | null; viewers: number | string | null; engagement_total: number | string | null; net_followers: number | string | null; women_percentage: number | string | null; men_percentage: number | string | null };
+type YouTubeAnalyticsRow = { social_platform_id: string; views: number | string | null; likes: number | string | null; shares: number | string | null; top_country: string | null };
+type LegacyAgeRow = { snapshot_id: string; range_label: string; percentage: number | string };
+type LegacyLocationRow = { snapshot_id: string; location_kind: string; location_name: string; percentage: number | string };
+type FacebookBreakdownRow = { snapshot_id: string; breakdown_kind: string; label: string; count_value: number | string | null; percentage_value: number | string | null };
+type InstagramAgeSelectionRow = { snapshot_id: string; age_range: string };
+type InstagramLocationSelectionRow = { snapshot_id: string; location_name: string };
+type FacebookAgeSelectionRow = { snapshot_id: string; age_group: string };
+type FacebookLocationSelectionRow = { snapshot_id: string; location_name: string };
 
-const dbPlatform = (platform: Platform) => platform.toLowerCase();
 const PLATFORM_LABELS = { instagram: 'Instagram', facebook: 'Facebook', youtube: 'YouTube' } as const;
+
 function platformLabel(value: string): Platform {
   const label = PLATFORM_LABELS[value as keyof typeof PLATFORM_LABELS];
   if (!label) throw new Error('Unsupported social platform.');
   return label;
 }
-const count = (value: string) => { const valueText = value.trim(); if (!/^\d+$/.test(valueText)) throw new Error('Enter non-negative whole-number counts.'); return valueText; };
-const percentage = (value: string) => { const valueText = value.trim(); if (!valueText) return null; const numericValue = Number(valueText); if (!Number.isFinite(numericValue) || numericValue < 0 || numericValue > 100) throw new Error('Enter percentages from 0 to 100.'); return valueText; };
-const optionalCount = (value?: string) => !value?.trim() ? null : count(value);
 
-async function replaceAudienceRows(snapshotId: string, insights: any) {
-  const supabase = getSupabaseClient(); if (!supabase) throw new Error('Sign in to save your social platforms.');
-  const ageRows = Object.entries(insights.audience.ages || {}).filter(([, value]) => String(value).trim()).map(([range_label, value], sort_order) => ({ snapshot_id: snapshotId, range_label, percentage: percentage(String(value)), sort_order }));
-  const locationRows = (['countries', 'cities'] as const).flatMap((key) => (insights.audience.locations?.[key] || []).filter((item: any) => item.name?.trim() && item.percentage?.trim()).map((item: any, sort_order: number) => ({ snapshot_id: snapshotId, location_kind: key === 'countries' ? 'country' : 'city', location_name: item.name.trim(), percentage: percentage(item.percentage), sort_order })));
-  const [{ error: ageDeleteError }, { error: locationDeleteError }] = await Promise.all([supabase.from('creator_social_audience_age_ranges').delete().eq('snapshot_id', snapshotId), supabase.from('creator_social_audience_locations').delete().eq('snapshot_id', snapshotId)]);
-  if (ageDeleteError || locationDeleteError) throw new Error('We could not update audience details.');
-  if (ageRows.length) { const { error } = await supabase.from('creator_social_audience_age_ranges').insert(ageRows); if (error) throw new Error('We could not save age ranges.'); }
-  if (locationRows.length) { const { error } = await supabase.from('creator_social_audience_locations').insert(locationRows); if (error) throw new Error('We could not save locations.'); }
+function text(value: number | string | null | undefined) {
+  return value === null || value === undefined ? '' : String(value);
 }
 
-async function currentSnapshot(platformId: string, platform: string, periodDays: string) {
-  const supabase = getSupabaseClient(); if (!supabase) throw new Error('Sign in to save your social platforms.');
-  const { data: existing, error: lookupError } = await supabase.from('creator_social_analytics_snapshots').select('id').eq('social_platform_id', platformId).eq('period_days', Number(periodDays)).eq('is_current', true).maybeSingle();
-  if (lookupError) throw new Error('We could not load analytics snapshots.');
-  if (existing) return existing.id as string;
-  const { data, error } = await supabase.from('creator_social_analytics_snapshots').insert({ social_platform_id: platformId, platform, period_days: Number(periodDays), is_current: true }).select('id').single();
-  if (error || !data) throw new Error('We could not create an analytics snapshot.');
-  return data.id as string;
+function rowsForSnapshot<T extends { snapshot_id: string }>(rows: T[], snapshotId: string) {
+  return rows.filter((row) => row.snapshot_id === snapshotId);
 }
 
-async function saveInstagram(platformId: string, account: Account) {
-  const insights = account.instagramInsights; const snapshotId = await currentSnapshot(platformId, 'instagram', insights.period);
-  const overview = insights.overview; const audience = insights.audience; const supabase = getSupabaseClient(); if (!supabase) throw new Error('Sign in to save your social platforms.');
-  const payload = { snapshot_id: snapshotId, platform: 'instagram', views_all_content: optionalCount(overview.views), overview_followers_percentage: percentage(overview.followersPercent), overview_non_followers_percentage: percentage(overview.nonFollowersPercent), net_followers: optionalCount(overview.netFollowers), interactions: optionalCount(overview.interactions), viewers_total: optionalCount(overview.viewersTotal), posts_views: optionalCount(overview.postsViews), reels_views: optionalCount(overview.reelsViews), stories_views: optionalCount(overview.storiesViews), live_videos_views: optionalCount(overview.liveVideosViews), all_interactions: optionalCount(overview.allInteractions), posts_interactions: optionalCount(overview.postsInteractions), reels_interactions: optionalCount(overview.reelsInteractions), stories_interactions: optionalCount(overview.storiesInteractions), live_videos_interactions: optionalCount(overview.liveVideosInteractions), profile_visits: optionalCount(overview.profileVisits), bio_link_taps: optionalCount(overview.bioLinkTaps), business_address_taps: optionalCount(overview.businessAddressTaps), audience_followers: optionalCount(audience.followers), follower_growth: optionalCount(audience.followerGrowth), women_percentage: percentage(audience.women), men_percentage: percentage(audience.men) };
-  const { error } = await supabase.from('creator_instagram_analytics').upsert(payload, { onConflict: 'snapshot_id' }); if (error) throw new Error('We could not save Instagram Insights.');
-  await replaceAudienceRows(snapshotId, insights);
-}
-
-async function saveFacebook(platformId: string, account: Account) {
-  const insights = account.facebookInsights; const snapshotId = await currentSnapshot(platformId, 'facebook', insights.period); const supabase = getSupabaseClient(); if (!supabase) throw new Error('Sign in to save your social platforms.');
-  const overview = insights.overview; const engagement = insights.engagement; const audience = insights.audience;
-  const payload = { snapshot_id: snapshotId, platform: 'facebook', views_total: optionalCount(overview.viewsTotal), viewers: optionalCount(overview.viewers), view_type_views: optionalCount(overview.viewType.views), view_type_three_second_views: optionalCount(overview.viewType.threeSecondViews), view_type_one_minute_views: optionalCount(overview.viewType.oneMinuteViews), overview_viewer_followers_percentage: percentage(overview.viewerType.followers), overview_viewer_non_followers_percentage: percentage(overview.viewerType.nonFollowers), engagement_total: optionalCount(engagement.total), new_conversations: optionalCount(engagement.newConversations), net_followers: optionalCount(audience.netFollowers), women_percentage: percentage(audience.women), men_percentage: percentage(audience.men) };
-  const { error } = await supabase.from('creator_facebook_analytics').upsert(payload, { onConflict: 'snapshot_id' }); if (error) throw new Error('We could not save Facebook Analytics.');
-  await replaceAudienceRows(snapshotId, insights);
-  const rows = [
-    ...overview.mediaTypes.filter((item: any) => item.mediaType.trim() && item.percentage.trim()).map((item: any, sort_order: number) => ({ snapshot_id: snapshotId, breakdown_kind: 'view_media_type', label: item.mediaType.trim(), percentage_value: percentage(item.percentage), count_value: null, sort_order })),
-    ...engagement.mediaTypes.filter((item: any) => item.mediaType.trim() && item.count.trim()).map((item: any, sort_order: number) => ({ snapshot_id: snapshotId, breakdown_kind: 'engagement_media_type', label: item.mediaType.trim(), count_value: optionalCount(item.count), percentage_value: null, sort_order })),
-    ...engagement.interactionTypes.filter((item: any) => item.name.trim() && item.value.trim()).map((item: any, sort_order: number) => ({ snapshot_id: snapshotId, breakdown_kind: 'interaction_type', label: item.name.trim(), count_value: optionalCount(item.value), percentage_value: null, sort_order })),
-  ];
-  const { error: deleteError } = await supabase.from('creator_facebook_analytics_breakdowns').delete().eq('snapshot_id', snapshotId); if (deleteError) throw new Error('We could not update Facebook breakdowns.');
-  if (rows.length) { const { error: insertError } = await supabase.from('creator_facebook_analytics_breakdowns').insert(rows); if (insertError) throw new Error('We could not save Facebook breakdowns.'); }
+function throwIfError(error: { message: string } | null, message: string) {
+  if (error) throw new Error(message);
 }
 
 export async function saveSocialAccounts(creatorId: string, accounts: Account[]) {
-  const supabase = getSupabaseClient(); if (!supabase) throw new Error('Sign in to save your social platforms.');
+  const supabase = getSupabaseClient();
+  if (!supabase) throw new Error('Sign in to save your social platforms.');
   void creatorId;
   const { error } = await supabase.rpc('save_creator_social_platforms', { p_accounts: accounts });
-  if (error) throw new Error('We could not save your social platforms. Please try again.');
+  throwIfError(error, 'We could not save your social platforms. Please try again.');
 }
 
 export async function loadSocialAccounts(creatorId: string): Promise<Account[]> {
-  const supabase = getSupabaseClient(); if (!supabase) throw new Error('Sign in to load your social platforms.');
-  const { data: platforms, error } = await supabase.from('creator_social_platforms').select('*').eq('creator_id', creatorId); if (error) throw new Error('We could not load your social platforms.');
-  if (!platforms?.length) return [];
-  const ids = platforms.map((row: any) => row.id);
-  const { data: snapshots, error: snapshotsError } = await supabase.from('creator_social_analytics_snapshots').select('*').in('social_platform_id', ids).eq('is_current', true).order('updated_at', { ascending: false });
-  if (snapshotsError) throw new Error('We could not load your social analytics snapshots.');
-  const latest = new Map<string, any>(); (snapshots || []).forEach((row: any) => { if (!latest.has(row.social_platform_id)) latest.set(row.social_platform_id, row); });
-  const snapshotIds = [...latest.values()].map((row) => row.id); if (!snapshotIds.length) { const { data: youtubeData, error: youtubeError } = await supabase.from('creator_youtube_analytics').select('*').in('social_platform_id', ids); if (youtubeError) throw new Error('We could not load your saved YouTube analytics.'); const youtube = new Map((youtubeData || []).map((row: any) => [row.social_platform_id, row])); return platforms.map((row: any) => { const platform = platformLabel(row.platform); const base: Account = { id: row.id, platform, platformName: platform, profileUrl: row.profile_url, username: row.username || '', audienceCount: String(row.audience_count), isPrimary: row.is_primary }; const data = youtube.get(row.id); return platform === 'YouTube' && data ? { ...base, youtubeInsights: { views: String(data.views ?? ''), likes: String(data.likes ?? ''), shares: String(data.shares ?? ''), topCountry: String(data.top_country ?? '') } } : base; }); }
-  const [instagram, facebook, youtube, ages, locations, breakdowns, instagramTopAges, instagramTopLocations] = await Promise.all([
-    supabase.from('creator_instagram_analytics').select('*').in('snapshot_id', snapshotIds), supabase.from('creator_facebook_analytics').select('*').in('snapshot_id', snapshotIds), supabase.from('creator_youtube_analytics').select('*').in('social_platform_id', ids), supabase.from('creator_social_audience_age_ranges').select('*').in('snapshot_id', snapshotIds).order('sort_order'), supabase.from('creator_social_audience_locations').select('*').in('snapshot_id', snapshotIds).order('sort_order'), supabase.from('creator_facebook_analytics_breakdowns').select('*').in('snapshot_id', snapshotIds).order('sort_order'), supabase.from('creator_instagram_top_age_ranges').select('*').in('snapshot_id', snapshotIds).order('display_order'), supabase.from('creator_instagram_top_locations').select('*').in('snapshot_id', snapshotIds).order('display_order'),
+  const supabase = getSupabaseClient();
+  if (!supabase) throw new Error('Sign in to load your social platforms.');
+
+  const { data: platformData, error: platformError } = await supabase.from('creator_social_platforms').select('id, platform, profile_url, username, audience_count, is_primary').eq('creator_id', creatorId);
+  throwIfError(platformError, 'We could not load your social platforms.');
+  const platforms = (platformData || []) as PlatformRow[];
+  if (!platforms.length) return [];
+  const platformIds = platforms.map((platform) => platform.id);
+
+  const { data: snapshotData, error: snapshotError } = await supabase.from('creator_social_analytics_snapshots').select('id, social_platform_id, platform, updated_at').in('social_platform_id', platformIds).eq('is_current', true).order('updated_at', { ascending: false });
+  throwIfError(snapshotError, 'We could not load your social analytics snapshots.');
+  const latestSnapshots = new Map<string, SnapshotRow>();
+  for (const snapshot of (snapshotData || []) as SnapshotRow[]) if (!latestSnapshots.has(snapshot.social_platform_id)) latestSnapshots.set(snapshot.social_platform_id, snapshot);
+  const snapshotIds = [...latestSnapshots.values()].map((snapshot) => snapshot.id);
+
+  const [instagramResult, facebookResult, youtubeResult, ageResult, locationResult, facebookBreakdownResult, instagramAgeResult, instagramLocationResult, facebookAgeResult, facebookLocationResult] = await Promise.all([
+    supabase.from('creator_instagram_analytics').select('snapshot_id, views_all_content, net_followers, interactions, viewers_total, profile_visits, women_percentage, men_percentage').in('snapshot_id', snapshotIds),
+    supabase.from('creator_facebook_analytics').select('snapshot_id, views_total, viewers, engagement_total, net_followers, women_percentage, men_percentage').in('snapshot_id', snapshotIds),
+    supabase.from('creator_youtube_analytics').select('social_platform_id, views, likes, shares, top_country').in('social_platform_id', platformIds),
+    supabase.from('creator_social_audience_age_ranges').select('snapshot_id, range_label, percentage, sort_order').in('snapshot_id', snapshotIds).order('sort_order'),
+    supabase.from('creator_social_audience_locations').select('snapshot_id, location_kind, location_name, percentage, sort_order').in('snapshot_id', snapshotIds).order('sort_order'),
+    supabase.from('creator_facebook_analytics_breakdowns').select('snapshot_id, breakdown_kind, label, count_value, percentage_value, sort_order').in('snapshot_id', snapshotIds).order('sort_order'),
+    supabase.from('creator_instagram_top_age_ranges').select('snapshot_id, age_range, display_order').in('snapshot_id', snapshotIds).order('display_order'),
+    supabase.from('creator_instagram_top_locations').select('snapshot_id, location_name, display_order').in('snapshot_id', snapshotIds).order('display_order'),
+    supabase.from('creator_facebook_top_age_groups').select('snapshot_id, age_group').in('snapshot_id', snapshotIds),
+    supabase.from('creator_facebook_top_locations').select('snapshot_id, location_name, display_order').in('snapshot_id', snapshotIds).order('display_order'),
   ]);
-  if (instagram.error || facebook.error || youtube.error || ages.error || locations.error || breakdowns.error || instagramTopAges.error || instagramTopLocations.error) throw new Error('We could not load your saved analytics.');
-  const ig = new Map((instagram.data || []).map((row: any) => [row.snapshot_id, row])); const fb = new Map((facebook.data || []).map((row: any) => [row.snapshot_id, row])); const yt = new Map((youtube.data || []).map((row: any) => [row.social_platform_id, row]));
-  const bySnapshot = (rows: any[], id: string) => rows.filter((row) => row.snapshot_id === id);
-  return platforms.map((row: any) => { const platform = platformLabel(row.platform); const snapshot = latest.get(row.id); const base: Account = { id: row.id, platform, platformName: platform, profileUrl: row.profile_url, username: row.username || '', audienceCount: String(row.audience_count), isPrimary: row.is_primary };
-    if (platform === 'YouTube') { const data = yt.get(row.id); return data ? { ...base, youtubeInsights: { views: String(data.views ?? ''), likes: String(data.likes ?? ''), shares: String(data.shares ?? ''), topCountry: String(data.top_country ?? '') } } : base; } if (!snapshot) return base;
-    const locationData = bySnapshot(locations.data || [], snapshot.id); const ageData = bySnapshot(ages.data || [], snapshot.id); const audience = { locations: { countries: locationData.filter((item) => item.location_kind === 'country').map((item) => ({ id: item.id, name: item.location_name, percentage: String(item.percentage) })), cities: locationData.filter((item) => item.location_kind === 'city').map((item) => ({ id: item.id, name: item.location_name, percentage: String(item.percentage) })) } };
-    if (platform === 'Instagram') { const data = ig.get(snapshot.id); if (!data) return base; const selectedAges = bySnapshot(instagramTopAges.data || [], snapshot.id).map((item) => item.age_range); const selectedCities = bySnapshot(instagramTopLocations.data || [], snapshot.id).map((item) => item.location_name); const legacyAges = [...ageData].sort((left, right) => Number(right.percentage) - Number(left.percentage)).slice(0, 2).map((item) => item.range_label); const legacyCities = locationData.filter((item) => item.location_kind === 'city').sort((left, right) => Number(right.percentage) - Number(left.percentage)).slice(0, 5).map((item) => item.location_name); return { ...base, instagramInsights: { period: String(snapshot.period_days), overview: { views: String(data.views_all_content ?? ''), followersPercent: String(data.overview_followers_percentage ?? ''), nonFollowersPercent: String(data.overview_non_followers_percentage ?? ''), netFollowers: String(data.net_followers ?? ''), interactions: String(data.interactions ?? ''), viewersTotal: String(data.viewers_total ?? ''), postsViews: String(data.posts_views ?? ''), reelsViews: String(data.reels_views ?? ''), storiesViews: String(data.stories_views ?? ''), liveVideosViews: String(data.live_videos_views ?? ''), allInteractions: String(data.all_interactions ?? ''), postsInteractions: String(data.posts_interactions ?? ''), reelsInteractions: String(data.reels_interactions ?? ''), storiesInteractions: String(data.stories_interactions ?? ''), liveVideosInteractions: String(data.live_videos_interactions ?? ''), profileVisits: String(data.profile_visits ?? ''), bioLinkTaps: String(data.bio_link_taps ?? ''), businessAddressTaps: String(data.business_address_taps ?? '') }, audience: { ...audience, followers: String(data.audience_followers ?? ''), followerGrowth: String(data.follower_growth ?? ''), women: String(data.women_percentage ?? ''), men: String(data.men_percentage ?? ''), ages: Object.fromEntries(ageData.map((item) => [item.range_label, String(item.percentage)])), topAgeRanges: selectedAges.length ? selectedAges : legacyAges, topCities: selectedCities.length ? selectedCities : legacyCities } } }; }
-    const data = fb.get(snapshot.id); if (!data) return base; const bs = bySnapshot(breakdowns.data || [], snapshot.id); const metrics = (kind: string) => bs.filter((item) => item.breakdown_kind === kind).map((item) => ({ id: item.id, name: item.label, value: String(item.count_value ?? item.percentage_value) })); return { ...base, facebookInsights: { period: String(snapshot.period_days), overview: { viewsTotal: String(data.views_total ?? ''), viewers: String(data.viewers ?? ''), mediaTypes: bs.filter((item) => item.breakdown_kind === 'view_media_type').map((item) => ({ id: item.id, mediaType: item.label, percentage: String(item.percentage_value) })), viewType: { views: String(data.view_type_views ?? ''), threeSecondViews: String(data.view_type_three_second_views ?? ''), oneMinuteViews: String(data.view_type_one_minute_views ?? '') }, viewerType: { followers: String(data.overview_viewer_followers_percentage ?? ''), nonFollowers: String(data.overview_viewer_non_followers_percentage ?? '') } }, engagement: { total: String(data.engagement_total ?? ''), mediaTypes: bs.filter((item) => item.breakdown_kind === 'engagement_media_type').map((item) => ({ id: item.id, mediaType: item.label, count: String(item.count_value) })), interactionTypes: metrics('interaction_type'), newConversations: String(data.new_conversations ?? '') }, audience: { ...audience, netFollowers: String(data.net_followers ?? ''), women: String(data.women_percentage ?? ''), men: String(data.men_percentage ?? ''), ageGroups: ageData.map((item) => ({ id: item.id, name: item.range_label, value: String(item.percentage) })) } } };
+  throwIfError(instagramResult.error, 'We could not load your saved Instagram analytics.');
+  throwIfError(facebookResult.error, 'We could not load your saved Facebook analytics.');
+  throwIfError(youtubeResult.error, 'We could not load your saved YouTube analytics.');
+  throwIfError(ageResult.error, 'We could not load your saved audience age ranges.');
+  throwIfError(locationResult.error, 'We could not load your saved audience locations.');
+  throwIfError(facebookBreakdownResult.error, 'We could not load your saved Facebook breakdowns.');
+  throwIfError(instagramAgeResult.error, 'We could not load your saved Instagram age selections.');
+  throwIfError(instagramLocationResult.error, 'We could not load your saved Instagram location selections.');
+  throwIfError(facebookAgeResult.error, 'We could not load your saved Facebook age selection.');
+  throwIfError(facebookLocationResult.error, 'We could not load your saved Facebook location selections.');
+
+  const instagramBySnapshot = new Map(((instagramResult.data || []) as InstagramAnalyticsRow[]).map((row) => [row.snapshot_id, row]));
+  const facebookBySnapshot = new Map(((facebookResult.data || []) as FacebookAnalyticsRow[]).map((row) => [row.snapshot_id, row]));
+  const youtubeByPlatform = new Map(((youtubeResult.data || []) as YouTubeAnalyticsRow[]).map((row) => [row.social_platform_id, row]));
+  const legacyAges = (ageResult.data || []) as LegacyAgeRow[];
+  const legacyLocations = (locationResult.data || []) as LegacyLocationRow[];
+  const facebookBreakdowns = (facebookBreakdownResult.data || []) as FacebookBreakdownRow[];
+  const instagramAgeSelections = (instagramAgeResult.data || []) as InstagramAgeSelectionRow[];
+  const instagramLocationSelections = (instagramLocationResult.data || []) as InstagramLocationSelectionRow[];
+  const facebookAgeSelections = (facebookAgeResult.data || []) as FacebookAgeSelectionRow[];
+  const facebookLocationSelections = (facebookLocationResult.data || []) as FacebookLocationSelectionRow[];
+
+  return platforms.map((platformRow) => {
+    const platform = platformLabel(platformRow.platform);
+    const account: Account = { id: platformRow.id, platform, platformName: platform, profileUrl: platformRow.profile_url, username: platformRow.username || '', audienceCount: text(platformRow.audience_count), isPrimary: platformRow.is_primary };
+    if (platform === 'YouTube') {
+      const analytics = youtubeByPlatform.get(platformRow.id);
+      return analytics ? { ...account, youtubeInsights: { views: text(analytics.views), likes: text(analytics.likes), shares: text(analytics.shares), topCountry: analytics.top_country || '' } } : account;
+    }
+    const snapshot = latestSnapshots.get(platformRow.id);
+    if (!snapshot) return account;
+    if (platform === 'Instagram') {
+      const analytics = instagramBySnapshot.get(snapshot.id);
+      if (!analytics) return account;
+      const selectedAges = rowsForSnapshot(instagramAgeSelections, snapshot.id).map((selection) => selection.age_range);
+      const selectedCities = rowsForSnapshot(instagramLocationSelections, snapshot.id).map((selection) => selection.location_name);
+      const fallbackAges = rowsForSnapshot(legacyAges, snapshot.id).sort((left, right) => Number(right.percentage) - Number(left.percentage)).slice(0, 2).map((selection) => selection.range_label);
+      const fallbackCities = rowsForSnapshot(legacyLocations, snapshot.id).filter((selection) => selection.location_kind === 'city').sort((left, right) => Number(right.percentage) - Number(left.percentage)).slice(0, 5).map((selection) => selection.location_name);
+      return { ...account, instagramInsights: { period: '30', overview: { views: text(analytics.views_all_content), netFollowers: text(analytics.net_followers), interactions: text(analytics.interactions), viewersTotal: text(analytics.viewers_total), profileVisits: text(analytics.profile_visits) }, audience: { women: text(analytics.women_percentage), men: text(analytics.men_percentage), topAgeRanges: selectedAges.length ? selectedAges : fallbackAges, topCities: selectedCities.length ? selectedCities : fallbackCities } } };
+    }
+    const analytics = facebookBySnapshot.get(snapshot.id);
+    if (!analytics) return account;
+    const breakdowns = rowsForSnapshot(facebookBreakdowns, snapshot.id);
+    const audienceAges = rowsForSnapshot(legacyAges, snapshot.id).map((selection) => ({ id: `${snapshot.id}-${selection.range_label}`, name: selection.range_label, value: text(selection.percentage) }));
+    const audienceLocations = rowsForSnapshot(legacyLocations, snapshot.id);
+    return { ...account, facebookInsights: { period: '28', overview: { viewsTotal: text(analytics.views_total), viewers: text(analytics.viewers), mediaTypes: breakdowns.filter((item) => item.breakdown_kind === 'view_media_type').map((item) => ({ id: `${snapshot.id}-${item.label}`, mediaType: item.label, percentage: text(item.percentage_value) })), viewType: { views: '', threeSecondViews: '', oneMinuteViews: '' }, viewerType: { followers: '', nonFollowers: '' } }, engagement: { total: text(analytics.engagement_total), mediaTypes: breakdowns.filter((item) => item.breakdown_kind === 'engagement_media_type').map((item) => ({ id: `${snapshot.id}-${item.label}`, mediaType: item.label, count: text(item.count_value) })), interactionTypes: breakdowns.filter((item) => item.breakdown_kind === 'interaction_type').map((item) => ({ id: `${snapshot.id}-${item.label}`, name: item.label, value: text(item.count_value) })), newConversations: '' }, audience: { netFollowers: text(analytics.net_followers), women: text(analytics.women_percentage), men: text(analytics.men_percentage), ageGroups: audienceAges, locations: { countries: audienceLocations.filter((item) => item.location_kind === 'country').map((item) => ({ id: `${snapshot.id}-${item.location_name}`, name: item.location_name, percentage: text(item.percentage) })), cities: audienceLocations.filter((item) => item.location_kind === 'city').map((item) => ({ id: `${snapshot.id}-${item.location_name}`, name: item.location_name, percentage: text(item.percentage) })) }, topAgeGroup: rowsForSnapshot(facebookAgeSelections, snapshot.id)[0]?.age_group || '', topCities: rowsForSnapshot(facebookLocationSelections, snapshot.id).map((selection) => selection.location_name) } } };
   });
 }

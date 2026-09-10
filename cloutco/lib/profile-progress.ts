@@ -59,8 +59,9 @@ type FacebookAnalyticsRecord = {
   views_total: number | string | null;
   viewers: number | string | null;
   engagement_total: number | string | null;
-  new_conversations: number | string | null;
   net_followers: number | string | null;
+  women_percentage: number | string | null;
+  men_percentage: number | string | null;
 };
 
 type YouTubeAnalyticsRecord = {
@@ -69,15 +70,6 @@ type YouTubeAnalyticsRecord = {
   likes: number | string | null;
   shares: number | string | null;
   top_country: string | null;
-};
-
-type CreatorPortfolioItemRecord = {
-  content_url: string | null;
-  platform: string | null;
-  content_type: string | null;
-  content_type_other: string | null;
-  category: string | null;
-  category_other: string | null;
 };
 
 export type ProfileSectionProgress = ProfileSection & {
@@ -147,13 +139,6 @@ export function isContentAndNicheComplete(content: CreatorContentProfileRecord |
   return true;
 }
 
-function isPersistedPortfolioItemComplete(item: CreatorPortfolioItemRecord) {
-  if (!isNonBlank(item.content_url) || !isNonBlank(item.platform) || !isNonBlank(item.content_type)) return false;
-  if (item.content_type === 'Other' && !isNonBlank(item.content_type_other)) return false;
-  if (item.category === 'Other' && !isNonBlank(item.category_other)) return false;
-  return true;
-}
-
 function isPersistedInstagramAnalyticsComplete(analytics: InstagramAnalyticsRecord | undefined, topAgeRangeCount: number, topLocationCount: number) {
   if (!analytics) return false;
   const requiredCounts = [
@@ -171,14 +156,18 @@ function isPersistedInstagramAnalyticsComplete(analytics: InstagramAnalyticsReco
     && topLocationCount >= 1;
 }
 
-function isPersistedFacebookAnalyticsComplete(analytics: FacebookAnalyticsRecord | undefined) {
+function isPersistedFacebookAnalyticsComplete(analytics: FacebookAnalyticsRecord | undefined, topAgeGroupCount: number, topLocationCount: number) {
   return Boolean(analytics && [
     analytics.views_total,
     analytics.viewers,
     analytics.engagement_total,
-    analytics.new_conversations,
     analytics.net_followers,
-  ].every(isNonNegativeWholeNumber));
+  ].every(isNonNegativeWholeNumber)
+    && isPercentage(analytics.women_percentage)
+    && isPercentage(analytics.men_percentage)
+    && topAgeGroupCount === 1
+    && topLocationCount >= 1
+    && topLocationCount <= 5);
 }
 
 function isPersistedYouTubeAnalyticsComplete(analytics: YouTubeAnalyticsRecord | undefined) {
@@ -194,6 +183,8 @@ function isSocialPlatformsComplete(
   instagramTopAgeRangeCounts: Map<string, number>,
   instagramTopLocationCounts: Map<string, number>,
   facebookAnalytics: Map<string, FacebookAnalyticsRecord>,
+  facebookTopAgeGroupCounts: Map<string, number>,
+  facebookTopLocationCounts: Map<string, number>,
   youtubeAnalytics: Map<string, YouTubeAnalyticsRecord>,
 ) {
   if (!platforms.length || !platforms.every((platform) => isHttpUrl(platform.profile_url) && isNonNegativeWholeNumber(platform.audience_count))) return false;
@@ -207,7 +198,7 @@ function isSocialPlatformsComplete(
 
   return primaryPlatform.platform === 'instagram'
     ? isPersistedInstagramAnalyticsComplete(instagramAnalytics.get(snapshot.id), instagramTopAgeRangeCounts.get(snapshot.id) || 0, instagramTopLocationCounts.get(snapshot.id) || 0)
-    : isPersistedFacebookAnalyticsComplete(facebookAnalytics.get(snapshot.id));
+    : isPersistedFacebookAnalyticsComplete(facebookAnalytics.get(snapshot.id), facebookTopAgeGroupCounts.get(snapshot.id) || 0, facebookTopLocationCounts.get(snapshot.id) || 0);
 }
 
 function throwIfError(error: { message: string } | null, message: string) {
@@ -231,25 +222,24 @@ export async function loadCreatorProfileProgress(): Promise<CreatorProfileProgre
   if (!creatorData) throw new Error('Creator profile not found.');
 
   const creator = creatorData as CreatorRecord;
-  const [identityResult, contentResult, platformsResult, portfolioResult] = await Promise.all([
+  const [identityResult, contentResult, platformsResult] = await Promise.all([
     supabase.from('creator_identity').select('display_name, bio, creator_type').eq('creator_id', creator.id).maybeSingle(),
     supabase.from('creator_content_profile').select('primary_niche, primary_niche_other, other_niches, other_niches_other, content_formats, content_formats_other, content_styles, content_styles_other').eq('creator_id', creator.id).maybeSingle(),
     supabase.from('creator_social_platforms').select('id, platform, profile_url, audience_count, is_primary').eq('creator_id', creator.id),
-    supabase.from('creator_portfolio_items').select('content_url, platform, content_type, content_type_other, category, category_other').eq('creator_id', creator.id),
   ]);
   throwIfError(identityResult.error, 'We could not load creator identity');
   throwIfError(contentResult.error, 'We could not load content and niche details');
   throwIfError(platformsResult.error, 'We could not load social platforms');
-  throwIfError(portfolioResult.error, 'We could not load portfolio items');
 
   const platforms = (platformsResult.data || []) as SocialPlatformRecord[];
-  const portfolioItems = (portfolioResult.data || []) as CreatorPortfolioItemRecord[];
   const platformIds = platforms.map((platform) => platform.id);
   const latestSnapshots = new Map<string, SocialSnapshotRecord>();
   let instagramAnalytics = new Map<string, InstagramAnalyticsRecord>();
   const instagramTopAgeRangeCounts = new Map<string, number>();
   const instagramTopLocationCounts = new Map<string, number>();
   let facebookAnalytics = new Map<string, FacebookAnalyticsRecord>();
+  const facebookTopAgeGroupCounts = new Map<string, number>();
+  const facebookTopLocationCounts = new Map<string, number>();
   let youtubeAnalytics = new Map<string, YouTubeAnalyticsRecord>();
 
   if (platformIds.length) {
@@ -273,21 +263,27 @@ export async function loadCreatorProfileProgress(): Promise<CreatorProfileProgre
 
     const snapshotIds = [...latestSnapshots.values()].map((snapshot) => snapshot.id);
     if (snapshotIds.length) {
-      const [instagramResult, facebookResult, instagramTopAgeRangesResult, instagramTopLocationsResult] = await Promise.all([
+      const [instagramResult, facebookResult, instagramTopAgeRangesResult, instagramTopLocationsResult, facebookTopAgeGroupsResult, facebookTopLocationsResult] = await Promise.all([
         supabase.from('creator_instagram_analytics').select('snapshot_id, views_all_content, net_followers, interactions, viewers_total, profile_visits, women_percentage, men_percentage').in('snapshot_id', snapshotIds),
-        supabase.from('creator_facebook_analytics').select('snapshot_id, views_total, viewers, engagement_total, new_conversations, net_followers').in('snapshot_id', snapshotIds),
+        supabase.from('creator_facebook_analytics').select('snapshot_id, views_total, viewers, engagement_total, net_followers, women_percentage, men_percentage').in('snapshot_id', snapshotIds),
         supabase.from('creator_instagram_top_age_ranges').select('snapshot_id').in('snapshot_id', snapshotIds),
         supabase.from('creator_instagram_top_locations').select('snapshot_id').in('snapshot_id', snapshotIds),
+        supabase.from('creator_facebook_top_age_groups').select('snapshot_id').in('snapshot_id', snapshotIds),
+        supabase.from('creator_facebook_top_locations').select('snapshot_id').in('snapshot_id', snapshotIds),
       ]);
       throwIfError(instagramResult.error, 'We could not load Instagram analytics');
       throwIfError(facebookResult.error, 'We could not load Facebook analytics');
       throwIfError(instagramTopAgeRangesResult.error, 'We could not load Instagram top age ranges');
       throwIfError(instagramTopLocationsResult.error, 'We could not load Instagram top locations');
+      throwIfError(facebookTopAgeGroupsResult.error, 'We could not load Facebook top age groups');
+      throwIfError(facebookTopLocationsResult.error, 'We could not load Facebook top locations');
 
       instagramAnalytics = new Map(((instagramResult.data || []) as InstagramAnalyticsRecord[]).map((analytics) => [analytics.snapshot_id, analytics]));
       facebookAnalytics = new Map(((facebookResult.data || []) as FacebookAnalyticsRecord[]).map((analytics) => [analytics.snapshot_id, analytics]));
       for (const selection of instagramTopAgeRangesResult.data || []) instagramTopAgeRangeCounts.set(selection.snapshot_id, (instagramTopAgeRangeCounts.get(selection.snapshot_id) || 0) + 1);
       for (const selection of instagramTopLocationsResult.data || []) instagramTopLocationCounts.set(selection.snapshot_id, (instagramTopLocationCounts.get(selection.snapshot_id) || 0) + 1);
+      for (const selection of facebookTopAgeGroupsResult.data || []) facebookTopAgeGroupCounts.set(selection.snapshot_id, (facebookTopAgeGroupCounts.get(selection.snapshot_id) || 0) + 1);
+      for (const selection of facebookTopLocationsResult.data || []) facebookTopLocationCounts.set(selection.snapshot_id, (facebookTopLocationCounts.get(selection.snapshot_id) || 0) + 1);
     }
   }
 
@@ -295,8 +291,7 @@ export async function loadCreatorProfileProgress(): Promise<CreatorProfileProgre
     'basic-information': isBasicInformationComplete(creator),
     'creator-identity': isCreatorIdentityComplete(identityResult.data as CreatorIdentityRecord | null),
     'content-and-niche': isContentAndNicheComplete(contentResult.data as CreatorContentProfileRecord | null),
-    'social-platforms': isSocialPlatformsComplete(platforms, latestSnapshots, instagramAnalytics, instagramTopAgeRangeCounts, instagramTopLocationCounts, facebookAnalytics, youtubeAnalytics),
-    'portfolio': portfolioItems.some(isPersistedPortfolioItemComplete),
+    'social-platforms': isSocialPlatformsComplete(platforms, latestSnapshots, instagramAnalytics, instagramTopAgeRangeCounts, instagramTopLocationCounts, facebookAnalytics, facebookTopAgeGroupCounts, facebookTopLocationCounts, youtubeAnalytics),
   };
 
   const sections = profileSections.map((section) => ({ ...section, completed: completedByKey[section.key] }));
