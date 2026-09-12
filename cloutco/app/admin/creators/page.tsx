@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import type { AdminCreatorListRow, AdminCreatorStatusCounts } from '@/lib/admin-creator-types';
@@ -8,14 +9,14 @@ import { getSupabaseClient } from '@/lib/supabase/client';
 type StatusFilter = '' | 'pending' | 'active' | 'rejected';
 type SortOption = 'recent' | 'oldest' | 'name_asc' | 'name_desc' | 'followers_desc' | 'followers_asc' | 'completion_desc' | 'completion_asc';
 type FollowerRange = 'any' | '0-1k' | '1k-10k' | '10k-50k' | '50k-100k' | '100k-500k' | '500k-1m' | '1m-plus';
-type CompletionFilter = 'all' | '5' | '4' | '3' | '2' | '1' | '0';
+type CompletionFilter = 'all' | '4' | '3' | '2' | '1' | '0';
 type JoinedFilter = 'any' | 'today' | '7-days' | '30-days' | '90-days';
 
 const PAGE_SIZES = [25, 50, 100] as const;
 
 const STATUS_META: Record<Exclude<StatusFilter, ''>, { label: string; countKey: keyof AdminCreatorStatusCounts; className: string }> = {
-  pending: { label: 'Pending', countKey: 'pending_count', className: 'border-[#e8d8a8] bg-[#fffaf0] text-[#80611b]' },
-  active: { label: 'Active', countKey: 'active_count', className: 'border-[#cce8da] bg-[#f3fbf6] text-[#26754b]' },
+  pending: { label: 'Pending Review', countKey: 'pending_count', className: 'border-[#e8d8a8] bg-[#fffaf0] text-[#80611b]' },
+  active: { label: 'Approved', countKey: 'active_count', className: 'border-[#cce8da] bg-[#f3fbf6] text-[#26754b]' },
   rejected: { label: 'Rejected', countKey: 'rejected_count', className: 'border-[#f0cfd2] bg-[#fff6f6] text-[#a44852]' },
 };
 
@@ -167,7 +168,7 @@ function FilterControls(props: FilterControlsProps) {
     </label>
     <label className="text-xs font-semibold text-[#575e6b]">Profile completion
       <select value={props.completion} onChange={(event) => props.onCompletionChange(event.target.value as CompletionFilter)} className={selectClassName}>
-        <option value="all">All</option><option value="5">5/5</option><option value="4">4/5</option><option value="3">3/5</option><option value="2">2/5</option><option value="1">1/5</option><option value="0">0/5</option>
+        <option value="all">All</option><option value="4">4/4</option><option value="3">3/4</option><option value="2">2/4</option><option value="1">1/4</option><option value="0">0/4</option>
       </select>
     </label>
     <label className="text-xs font-semibold text-[#575e6b]">Joined
@@ -192,6 +193,7 @@ export default function AdminCreatorsPage() {
   const status: StatusFilter = requestedStatus === 'pending' || requestedStatus === 'active' || requestedStatus === 'rejected' ? requestedStatus : '';
   const [rows, setRows] = useState<AdminCreatorListRow[]>([]);
   const [counts, setCounts] = useState<AdminCreatorStatusCounts | null>(null);
+  const [filterCities, setFilterCities] = useState<string[]>([]);
   const [searchValue, setSearchValue] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [city, setCity] = useState('');
@@ -214,7 +216,7 @@ export default function AdminCreatorsPage() {
   const effectiveSort: SortOption = status === 'pending' && !sortTouched ? 'oldest' : sort;
   const bounds = useMemo(() => followerBounds(followers), [followers]);
   const joinedAfterValue = useMemo(() => joinedAfter(joined), [joined]);
-  const availableCities = useMemo(() => [...new Set(rows.map((creator) => creator.current_city.trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b)), [rows]);
+  const availableCities = useMemo(() => filterCities.length ? filterCities : [...new Set(rows.map((creator) => creator.current_city.trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b)), [filterCities, rows]);
   const totalCount = numericValue(rows[0]?.total_count);
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
   const hasActiveFilters = Boolean(searchValue.trim() || status || city || niche || creatorType || platform || followers !== 'any' || completion !== 'all' || joined !== 'any');
@@ -246,6 +248,18 @@ export default function AdminCreatorsPage() {
     void loadCounts();
     return () => { active = false; };
   }, [refreshKey]);
+
+  useEffect(() => {
+    let active = true;
+    const supabase = getSupabaseClient();
+    if (!supabase) return;
+    void supabase.rpc('admin_creator_filter_options').then(({ data, error }) => {
+      if (!active || error || !data || typeof data !== 'object') return;
+      const cities = (data as { cities?: unknown }).cities;
+      if (Array.isArray(cities)) setFilterCities(cities.filter((value): value is string => typeof value === 'string'));
+    });
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -349,8 +363,8 @@ export default function AdminCreatorsPage() {
 
   const statusCards: Array<{ key: StatusFilter; label: string; count: number }> = [
     { key: '', label: 'All', count: numericValue(counts?.total_count) },
-    { key: 'pending', label: 'Pending', count: numericValue(counts?.pending_count) },
-    { key: 'active', label: 'Active', count: numericValue(counts?.active_count) },
+    { key: 'pending', label: 'Pending Review', count: numericValue(counts?.pending_count) },
+    { key: 'active', label: 'Approved', count: numericValue(counts?.active_count) },
     { key: 'rejected', label: 'Rejected', count: numericValue(counts?.rejected_count) },
   ];
 
@@ -397,7 +411,7 @@ export default function AdminCreatorsPage() {
         {creatorType && <span className="rounded-full bg-[#f7f5fa] px-3 py-1 text-xs text-[#575e6b]">{creatorTypeLabel(creatorType)}</span>}
         {platform && <span className="rounded-full bg-[#f7f5fa] px-3 py-1 text-xs text-[#575e6b]">{PLATFORM_OPTIONS.find((option) => option.value === platform)?.label}</span>}
         {followers !== 'any' && <span className="rounded-full bg-[#f7f5fa] px-3 py-1 text-xs text-[#575e6b]">Followers: {followers.replace('-', '–').replace('k', 'K').replace('m', 'M')}</span>}
-        {completion !== 'all' && <span className="rounded-full bg-[#f7f5fa] px-3 py-1 text-xs text-[#575e6b]">{completion}/5 complete</span>}
+        {completion !== 'all' && <span className="rounded-full bg-[#f7f5fa] px-3 py-1 text-xs text-[#575e6b]">{completion}/4 complete</span>}
         {joined !== 'any' && <span className="rounded-full bg-[#f7f5fa] px-3 py-1 text-xs text-[#575e6b]">{joined === 'today' ? 'Today' : `Last ${joined.replace('-days', '')} days`}</span>}
         <button type="button" onClick={clearAll} className="ml-1 text-xs font-semibold text-[#6330dc] hover:text-[#4f24bc]">Clear all</button>
       </div>}
@@ -413,12 +427,12 @@ export default function AdminCreatorsPage() {
           <p className="truncate text-sm text-[#555b67]">{creator.current_city || '—'}</p><p className="truncate text-sm text-[#555b67]">{displayNiche(creator)}</p>
           <div className="flex flex-wrap gap-1">{creator.platforms.map((item) => <span key={item.platform} className="rounded-md bg-[#f5f3f8] px-1.5 py-1 text-[0.65rem] font-bold text-[#5e6470]">{platformShortLabel(item.platform)}</span>)}</div>
           <p className="text-xs leading-5 text-[#555b67]">{creator.platforms.map((item) => `${platformShortLabel(item.platform)} ${formatAudience(item.audience_count)}`).join(' · ') || '—'}</p>
-          <p className="text-sm font-medium text-[#3d414a]">{creator.completed_sections} / {creator.total_required_sections}</p><StatusBadge status={creator.status} /><p className="text-sm text-[#555b67]">{formatDate(creator.created_at)}</p><button type="button" disabled className="text-left text-sm font-semibold text-[#9b8dc2]">Review →</button>
+          <p className="text-sm font-medium text-[#3d414a]">{creator.completed_sections} / {creator.total_required_sections}</p><StatusBadge status={creator.status} /><p className="text-sm text-[#555b67]">{formatDate(creator.created_at)}</p><Link href={`/admin/creators/${creator.creator_id}`} className="text-left text-sm font-semibold text-[#6330dc]">Review →</Link>
         </div>)}
       </section>
 
       <section className="mt-6 space-y-3 lg:hidden">
-        {rows.map((creator) => <article key={creator.creator_id} className="rounded-2xl border border-[#e8e7eb] bg-white p-4 shadow-[0_8px_20px_rgba(33,24,54,0.03)]"><div className="flex items-start gap-3"><div className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#eee8ff] text-xs font-bold text-[#6330dc]">{initials(creator.display_name || creator.full_name)}</div><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-[#25262b]">{creator.display_name || creator.full_name}</p><p className="mt-0.5 truncate text-xs text-[#747b89]">{creatorTypeLabel(creator.creator_type)}{creator.username ? ` · @${creator.username}` : ''}</p></div><StatusBadge status={creator.status} /></div><div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 text-xs"><p><span className="block font-medium text-[#8a909b]">Location</span><span className="mt-1 block text-[#4f5561]">{creator.current_city || '—'}</span></p><p><span className="block font-medium text-[#8a909b]">Niche</span><span className="mt-1 block truncate text-[#4f5561]">{displayNiche(creator)}</span></p><p><span className="block font-medium text-[#8a909b]">Audience</span><span className="mt-1 block text-[#4f5561]">{creator.platforms.map((item) => `${platformShortLabel(item.platform)} ${formatAudience(item.audience_count)}`).join(' · ') || '—'}</span></p><p><span className="block font-medium text-[#8a909b]">Profile</span><span className="mt-1 block text-[#4f5561]">{creator.completed_sections} / {creator.total_required_sections}</span></p></div><div className="mt-4 flex items-center justify-between border-t border-[#f0eef3] pt-3"><div className="flex gap-1">{creator.platforms.map((item) => <span key={item.platform} className="rounded-md bg-[#f5f3f8] px-1.5 py-1 text-[0.65rem] font-bold text-[#5e6470]">{platformShortLabel(item.platform)}</span>)}</div><button type="button" disabled className="text-sm font-semibold text-[#9b8dc2]">Review →</button></div></article>)}
+        {rows.map((creator) => <article key={creator.creator_id} className="rounded-2xl border border-[#e8e7eb] bg-white p-4 shadow-[0_8px_20px_rgba(33,24,54,0.03)]"><div className="flex items-start gap-3"><div className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#eee8ff] text-xs font-bold text-[#6330dc]">{initials(creator.display_name || creator.full_name)}</div><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-[#25262b]">{creator.display_name || creator.full_name}</p><p className="mt-0.5 truncate text-xs text-[#747b89]">{creatorTypeLabel(creator.creator_type)}{creator.username ? ` · @${creator.username}` : ''}</p></div><StatusBadge status={creator.status} /></div><div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 text-xs"><p><span className="block font-medium text-[#8a909b]">Location</span><span className="mt-1 block text-[#4f5561]">{creator.current_city || '—'}</span></p><p><span className="block font-medium text-[#8a909b]">Niche</span><span className="mt-1 block truncate text-[#4f5561]">{displayNiche(creator)}</span></p><p><span className="block font-medium text-[#8a909b]">Audience</span><span className="mt-1 block text-[#4f5561]">{creator.platforms.map((item) => `${platformShortLabel(item.platform)} ${formatAudience(item.audience_count)}`).join(' · ') || '—'}</span></p><p><span className="block font-medium text-[#8a909b]">Profile</span><span className="mt-1 block text-[#4f5561]">{creator.completed_sections} / {creator.total_required_sections}</span></p></div><div className="mt-4 flex items-center justify-between border-t border-[#f0eef3] pt-3"><div className="flex gap-1">{creator.platforms.map((item) => <span key={item.platform} className="rounded-md bg-[#f5f3f8] px-1.5 py-1 text-[0.65rem] font-bold text-[#5e6470]">{platformShortLabel(item.platform)}</span>)}</div><Link href={`/admin/creators/${creator.creator_id}`} className="text-sm font-semibold text-[#6330dc]">Review →</Link></div></article>)}
       </section>
 
       {!rows.length && <section className="mt-6 rounded-2xl border border-dashed border-[#dcd8e4] bg-white px-5 py-14 text-center"><p className="text-base font-semibold text-[#33353c]">{hasActiveFilters ? 'No creators match your current filters.' : 'No creators found.'}</p>{hasActiveFilters && <button type="button" onClick={clearAll} className="mt-3 text-sm font-semibold text-[#6330dc]">Clear filters</button>}</section>}

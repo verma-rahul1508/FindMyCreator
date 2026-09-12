@@ -39,7 +39,6 @@ function SignOutIcon() {
 function AdminNavigation({ email, onSignOut, onNavigate }: { email: string | null; onSignOut: () => void; onNavigate?: () => void }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const disabledItemClassName = 'flex w-full cursor-not-allowed items-center gap-3 rounded-xl px-3.5 py-3 text-left text-sm text-[#959ba8]';
   const navigationItemClassName = (active: boolean) => `flex items-center gap-3 rounded-xl px-3.5 py-3 text-sm transition ${active ? 'bg-[#f1ebff] font-semibold text-[#6330dc]' : 'font-medium text-[#515764] hover:bg-[#f8f6fb] hover:text-[#26282e]'}`;
   const creatorsActive = pathname.startsWith('/admin/creators');
   const pendingReviewActive = searchParams.get('status') === 'pending';
@@ -60,8 +59,8 @@ function AdminNavigation({ email, onSignOut, onNavigate }: { email: string | nul
           <Link href="/admin/creators?status=pending" onClick={onNavigate} className={`block rounded-lg px-2 py-2 text-xs transition ${pendingReviewActive ? 'font-semibold text-[#6330dc]' : 'text-[#697080] hover:bg-[#f8f6fb] hover:text-[#32343a]'}`}>Pending Review</Link>
         </div>
       </div>
-      <button type="button" disabled aria-disabled="true" className={disabledItemClassName}><AnalyticsIcon />Analytics<span className="ml-auto text-[0.62rem] font-semibold uppercase tracking-[0.08em]">Soon</span></button>
-      <button type="button" disabled aria-disabled="true" className={disabledItemClassName}><ReportsIcon />Reports<span className="ml-auto text-[0.62rem] font-semibold uppercase tracking-[0.08em]">Soon</span></button>
+      <Link href="/admin/analytics" onClick={onNavigate} className={navigationItemClassName(pathname === '/admin/analytics')}><AnalyticsIcon />Analytics</Link>
+      <Link href="/admin/reports" onClick={onNavigate} className={navigationItemClassName(pathname === '/admin/reports')}><ReportsIcon />Reports</Link>
     </nav>
 
     <div className="mt-auto border-t border-[#e8e7eb] p-4">
@@ -76,12 +75,14 @@ function AdminNavigation({ email, onSignOut, onNavigate }: { email: string | nul
 
 export function AdminShell({ email, children }: { email: string | null; children: ReactNode }) {
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
+  const router = useRouter();
 
   const signOut = async () => {
     const supabase = getSupabaseClient();
     await supabase?.auth.signOut();
     await fetch('/api/admin/session', { method: 'DELETE', cache: 'no-store' });
-    window.location.assign('/signin');
+    router.replace('/signin');
+    router.refresh();
   };
 
   return <main className="min-h-screen bg-[#fffdfc] text-[#151518]">

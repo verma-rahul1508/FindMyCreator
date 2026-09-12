@@ -372,7 +372,7 @@ export function ProfileSummaryCard({
       <div
         className={
           portraitPanel
-            ? "grid lg:grid-cols-[190px_minmax(0,1fr)_minmax(0,1fr)]"
+            ? "grid grid-cols-1 lg:grid-cols-[190px_minmax(0,1fr)_minmax(0,1fr)]"
             : "grid gap-8 lg:grid-cols-2 lg:gap-10"
         }
       >
@@ -383,12 +383,13 @@ export function ProfileSummaryCard({
               photoUrl={photoUrl}
               initials={initials}
               alt={displayName ? `Portrait of ${displayName}` : "Profile photo"}
-              className="h-[260px] overflow-hidden border-b border-[#e8e2f1] bg-[#f1eaff] text-3xl font-semibold text-[#6731dc] sm:h-[300px] lg:h-auto lg:min-h-full lg:border-b-0 lg:border-r"
+              className="h-[260px] w-full overflow-hidden border-b border-[#e8e2f1] bg-[#f1eaff] text-3xl font-semibold text-[#6731dc] sm:h-[300px] lg:h-auto lg:min-h-full lg:border-b-0 lg:border-r"
+              imageClassName="block h-full w-full object-cover object-center"
               fallbackClassName="grid h-full w-full place-items-center bg-[linear-gradient(145deg,#f6f0ff_0%,#e6d8ff_100%)]"
               onPhotoUpdated={onPhotoUpdated}
             />
           ) : (
-            <div className="relative h-[260px] overflow-hidden border-b border-[#e8e2f1] bg-[#f1eaff] text-3xl font-semibold text-[#6731dc] sm:h-[300px] lg:h-auto lg:min-h-full lg:border-b-0 lg:border-r">
+            <div className="relative h-[260px] w-full overflow-hidden border-b border-[#e8e2f1] bg-[#f1eaff] text-3xl font-semibold text-[#6731dc] sm:h-[300px] lg:h-auto lg:min-h-full lg:border-b-0 lg:border-r">
               {photoUrl ? (
                 <img
                   src={photoUrl}
@@ -407,7 +408,7 @@ export function ProfileSummaryCard({
         <div
           className={
             portraitPanel
-              ? "col-span-2 grid gap-8 px-6 py-7 sm:px-8 sm:py-9 lg:grid-cols-2 lg:gap-10 lg:px-10 lg:py-10"
+              ? "col-span-1 grid gap-8 px-6 py-7 sm:px-8 sm:py-9 lg:col-span-2 lg:grid-cols-2 lg:gap-10 lg:px-10 lg:py-10"
               : "contents"
           }
         >
@@ -726,7 +727,7 @@ export function PrimaryPlatformCard({ account }: { account: SocialAccount }) {
       <p className="text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-[#6330dc]">
         Primary Channel
       </p>
-      <div className="mt-4 flex items-start justify-between gap-4">
+      <div className="mt-4 flex min-w-0 items-start gap-4">
         <div className="flex min-w-0 items-center gap-4">
           <PlatformMark platform={account.platform} size="primary" />
           <div className="min-w-0">
@@ -739,7 +740,7 @@ export function PrimaryPlatformCard({ account }: { account: SocialAccount }) {
               </span>
             </div>
             {account.username?.trim() && (
-              <p className="mt-1 truncate text-sm text-[#615c6a]">
+              <p className="mt-1 break-words text-sm text-[#615c6a] [overflow-wrap:anywhere] sm:truncate">
                 @{account.username.trim().replace(/^@+/, "")}
               </p>
             )}
@@ -750,12 +751,22 @@ export function PrimaryPlatformCard({ account }: { account: SocialAccount }) {
             href={profileUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="shrink-0 text-sm font-medium text-[#6330dc] hover:text-[#4720b2]"
+            className="ml-auto hidden shrink-0 text-sm font-medium text-[#6330dc] hover:text-[#4720b2] sm:inline-flex"
           >
             View Profile <span aria-hidden="true">&rarr;</span>
           </a>
         )}
       </div>
+      {profileUrl && (
+        <a
+          href={profileUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-4 inline-flex w-full text-sm font-medium text-[#6330dc] hover:text-[#4720b2] sm:hidden"
+        >
+          View Profile <span aria-hidden="true">&rarr;</span>
+        </a>
+      )}
       {metrics.length ? (
         <div
           className={
@@ -769,22 +780,29 @@ export function PrimaryPlatformCard({ account }: { account: SocialAccount }) {
             <div
               key={metric.label}
               className={
-                "min-w-0 rounded-xl border border-[#e9e3f1] bg-white/80 px-3.5 py-3.5 " +
+                "min-w-0 rounded-xl border border-[#e9e3f1] bg-white/80 px-2 py-3.5 sm:px-3.5 " +
                 (simplifiedPlatform ? "h-full" : "")
               }
             >
-              <div className="flex min-h-7 items-center gap-2">
+              <div className="flex min-h-7 items-center justify-center gap-2 sm:justify-start">
                 <span
-                  aria-hidden="true"
+                  role="img"
+                  aria-label={metric.label}
+                  title={metric.label}
                   className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[#f1ebff] text-xs text-[#6531dc]"
                 >
-                  {metricIcon(metric.icon)}
+                  <span className="sm:hidden">
+                    {metric.icon === "views"
+                      ? String.fromCodePoint(0x1f441)
+                      : metricIcon(metric.icon)}
+                  </span>
+                  <span className="hidden sm:inline">{metricIcon(metric.icon)}</span>
                 </span>
-                <p className="text-[0.72rem] font-medium leading-4 text-[#686270]">
+                <p className="hidden text-[0.72rem] font-medium leading-4 text-[#686270] sm:block">
                   {metric.label}
                 </p>
               </div>
-              <p className="mt-3 break-words text-lg font-semibold tracking-[-0.05em] text-[#1f1c25] sm:text-xl">
+              <p className="mt-3 whitespace-nowrap text-center text-sm font-semibold tabular-nums tracking-[-0.05em] text-[#1f1c25] sm:text-left sm:text-xl">
                 {metric.value}
               </p>
             </div>
