@@ -79,12 +79,20 @@ export function CreatorHero() {
             CloutCo connects creators with brands for meaningful collaborations, paid opportunities and long-term partnerships.
           </p>
 
-          <Link
-            href="/signup"
-            className="mt-10 inline-flex min-h-16 items-center justify-center rounded-[18px] bg-[#6219e8] px-9 text-lg font-medium text-white shadow-[0_12px_28px_rgba(98,25,232,0.24)] transition hover:bg-[#5313cc]"
-          >
-            Join as a Creator <span className="ml-3 text-xl leading-none">↗</span>
-          </Link>
+          <div className="mt-8 flex flex-col items-start gap-3 sm:mt-10">
+            <Link
+              href="/signin"
+              className="text-sm font-medium text-[#5f28dc] hover:underline sm:hidden"
+            >
+              Sign In
+            </Link>
+            <Link
+              href="/signup"
+              className="inline-flex min-h-16 items-center justify-center rounded-[18px] bg-[#6219e8] px-9 text-lg font-medium text-white shadow-[0_12px_28px_rgba(98,25,232,0.24)] transition hover:bg-[#5313cc]"
+            >
+              Join as a Creator <span className="ml-3 text-xl leading-none">↗</span>
+            </Link>
+          </div>
 
           <p className="mt-12 flex flex-wrap items-center gap-x-4 gap-y-2 text-[0.95rem] leading-6 text-[#50576e] sm:text-base">
             <span className="inline-flex items-center gap-2"><span className="grid h-5 w-5 place-items-center rounded-full bg-[#6120df] text-xs text-white">✓</span>Free to join</span>

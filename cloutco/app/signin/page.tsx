@@ -132,7 +132,7 @@ export default function SigninPage() {
 
         <div className="relative grid min-h-[calc(100vh-9rem)] lg:grid-cols-[0.88fr_1.12fr]">
           <div className="pointer-events-none absolute -bottom-48 -left-40 h-[430px] w-[520px] rounded-full bg-[radial-gradient(circle,rgba(205,175,255,0.46),rgba(238,229,255,0.18)_48%,transparent_72%)]" />
-          <section className="relative flex flex-col justify-center px-7 py-14 sm:px-12 lg:px-[10.5%] lg:py-16">
+          <section className="order-2 relative flex flex-col justify-center px-7 py-14 sm:px-12 lg:order-1 lg:px-[10.5%] lg:py-16">
             <h1 className="max-w-[430px] text-[clamp(3rem,4.8vw,4.5rem)] font-semibold leading-[0.98] tracking-[-0.065em] text-black">
               Welcome back,<br /><span className="text-[#6330dc]">Creator.</span>
             </h1>
@@ -155,7 +155,7 @@ export default function SigninPage() {
             </div>
           </section>
 
-          <section className="relative flex items-center border-t border-[#e4e5e9] px-7 py-14 sm:px-12 lg:border-l lg:border-t-0 lg:px-[11%] lg:py-16">
+          <section className="order-1 relative flex items-center border-t border-[#e4e5e9] px-7 py-8 sm:px-12 sm:py-10 lg:order-2 lg:border-l lg:border-t-0 lg:px-[11%] lg:py-16">
             <div className="w-full max-w-[510px]">
               <h2 className="text-[2rem] font-semibold leading-none tracking-[-0.06em] text-black sm:text-[2.2rem]">Sign in</h2>
               <p className="mt-4 text-[0.95rem] text-[#586071]">Enter your details to access your account.</p>

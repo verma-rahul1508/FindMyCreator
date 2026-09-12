@@ -1,191 +1,2064 @@
-'use client';
+"use client";
 
-import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
-import type { ReactNode } from 'react';
-import { useRouter } from 'next/navigation';
-import { AuthAwareLogo } from '@/components/auth-aware-logo';
-import { AuthenticatedCreatorHeaderIdentity } from '@/components/authenticated-creator-header-identity';
-import { getSupabaseClient } from '@/lib/supabase/client';
-import { getNextProfileRoute } from '@/lib/profile-sections';
-import { loadSocialAccounts, saveSocialAccounts } from '@/lib/social-platform-persistence';
-import { InstagramAnalyticsEditor } from '@/components/instagram-analytics-editor';
-import { FacebookAnalyticsEditor } from '@/components/facebook-analytics-editor';
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+import type { ReactNode } from "react";
+import { useRouter } from "next/navigation";
+import { AuthAwareLogo } from "@/components/auth-aware-logo";
+import { AuthenticatedCreatorHeaderIdentity } from "@/components/authenticated-creator-header-identity";
+import { getSupabaseClient } from "@/lib/supabase/client";
+import { getNextProfileRoute } from "@/lib/profile-sections";
+import {
+  loadSocialAccounts,
+  saveSocialAccounts,
+} from "@/lib/social-platform-persistence";
+import { InstagramAnalyticsEditor } from "@/components/instagram-analytics-editor";
+import { FacebookAnalyticsEditor } from "@/components/facebook-analytics-editor";
 
-type Platform = 'Instagram' | 'Facebook' | 'YouTube';
+type Platform = "Instagram" | "Facebook" | "YouTube";
 type InsightLocation = { id: string; name: string; percentage: string };
 type LocationSuggestion = { value: string; detail?: string };
-type InstagramInsights = { period: '7' | '30' | '90'; overview: Record<string, string>; audience: { followers: string; followerGrowth: string; women: string; men: string; ages: Record<string, string>; locations: { countries: InsightLocation[]; cities: InsightLocation[] }; topAgeRanges: string[]; topCities: string[] } };
-type FacebookViewMediaType = { id: string; mediaType: string; percentage: string };
-type FacebookEngagementMediaType = { id: string; mediaType: string; count: string };
+type InstagramInsights = {
+  period: "7" | "30" | "90";
+  overview: Record<string, string>;
+  audience: {
+    followers: string;
+    followerGrowth: string;
+    women: string;
+    men: string;
+    ages: Record<string, string>;
+    locations: { countries: InsightLocation[]; cities: InsightLocation[] };
+    topAgeRanges: string[];
+    topCities: string[];
+  };
+};
+type FacebookViewMediaType = {
+  id: string;
+  mediaType: string;
+  percentage: string;
+};
+type FacebookEngagementMediaType = {
+  id: string;
+  mediaType: string;
+  count: string;
+};
 type FacebookMetric = { id: string; name: string; value: string };
-type FacebookInsights = { period: '7' | '28' | '90'; overview: { viewsTotal: string; viewers: string; mediaTypes: FacebookViewMediaType[]; viewType: Record<'views' | 'threeSecondViews' | 'oneMinuteViews', string>; viewerType: Record<'followers' | 'nonFollowers', string> }; engagement: { total: string; mediaTypes: FacebookEngagementMediaType[]; interactionTypes: FacebookMetric[]; newConversations: string }; audience: { netFollowers: string; women: string; men: string; ageGroups: FacebookMetric[]; locations: { countries: InsightLocation[]; cities: InsightLocation[] }; topAgeGroup?: string; topCities?: string[] } };
-type YouTubeInsights = { views: string; likes: string; shares: string; topCountry: string };
-type PlatformAccount = { id: string; platform: Platform; platformName: string; profileUrl: string; username: string; audienceCount: string; isPrimary: boolean; instagramInsights?: InstagramInsights; facebookInsights?: FacebookInsights; youtubeInsights?: YouTubeInsights };
+type FacebookInsights = {
+  period: "7" | "28" | "90";
+  overview: {
+    viewsTotal: string;
+    viewers: string;
+    mediaTypes: FacebookViewMediaType[];
+    viewType: Record<"views" | "threeSecondViews" | "oneMinuteViews", string>;
+    viewerType: Record<"followers" | "nonFollowers", string>;
+  };
+  engagement: {
+    total: string;
+    mediaTypes: FacebookEngagementMediaType[];
+    interactionTypes: FacebookMetric[];
+    newConversations: string;
+  };
+  audience: {
+    netFollowers: string;
+    women: string;
+    men: string;
+    ageGroups: FacebookMetric[];
+    locations: { countries: InsightLocation[]; cities: InsightLocation[] };
+    topAgeGroup?: string;
+    topCities?: string[];
+  };
+};
+type YouTubeInsights = {
+  views: string;
+  likes: string;
+  shares: string;
+  topCountry: string;
+};
+type PlatformAccount = {
+  id: string;
+  platform: Platform;
+  platformName: string;
+  profileUrl: string;
+  username: string;
+  audienceCount: string;
+  isPrimary: boolean;
+  instagramInsights?: InstagramInsights;
+  facebookInsights?: FacebookInsights;
+  youtubeInsights?: YouTubeInsights;
+};
 type FieldErrors = Record<string, string>;
 
-const platforms: Platform[] = ['Instagram', 'Facebook', 'YouTube'];
-const storageKey = 'cloutco-social-platforms-draft';
-const contentTypes = ['Posts', 'Reels', 'Stories', 'Live Videos'];
-const ageRanges = ['13–17', '18–24', '25–34', '35–44', '45–54', '55–64', '65+'];
-const emptyInsights = (): InstagramInsights => ({ period: '30', overview: { views: '', followersPercent: '', nonFollowersPercent: '', netFollowers: '', interactions: '', viewersTotal: '', postsViews: '', reelsViews: '', storiesViews: '', liveVideosViews: '', allInteractions: '', postsInteractions: '', reelsInteractions: '', storiesInteractions: '', liveVideosInteractions: '', profileVisits: '', bioLinkTaps: '', businessAddressTaps: '' }, audience: { followers: '', followerGrowth: '', women: '', men: '', ages: Object.fromEntries(ageRanges.map((range) => [range, ''])), locations: { countries: [], cities: [] }, topAgeRanges: [], topCities: [] } });
-const facebookViewMediaTypes = (): FacebookViewMediaType[] => ['Link', 'Reel', 'Photo'].map((mediaType) => ({ id: `views-${mediaType.toLowerCase()}`, mediaType, percentage: '' }));
-const facebookEngagementMediaTypes = (): FacebookEngagementMediaType[] => ['Link', 'Reel', 'Photo'].map((mediaType) => ({ id: `engagement-${mediaType.toLowerCase()}`, mediaType, count: '' }));
-const facebookMetrics = (prefix: string, names: string[]): FacebookMetric[] => names.map((name) => ({ id: `${prefix}-${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`, name, value: '' }));
-const emptyFacebookInsights = (): FacebookInsights => ({ period: '28', overview: { viewsTotal: '', viewers: '', mediaTypes: facebookViewMediaTypes(), viewType: { views: '', threeSecondViews: '', oneMinuteViews: '' }, viewerType: { followers: '', nonFollowers: '' } }, engagement: { total: '', mediaTypes: facebookEngagementMediaTypes(), interactionTypes: facebookMetrics('interaction', ['Reactions', 'Comments & replies', 'Shares']), newConversations: '' }, audience: { netFollowers: '', women: '', men: '', ageGroups: facebookMetrics('age', ['18–24', '25–34', '35–44', 'Other']), locations: { countries: [], cities: [] } } });
-const emptyYouTubeInsights = (): YouTubeInsights => ({ views: '', likes: '', shares: '', topCountry: '' });
+const platforms: Platform[] = ["Instagram", "Facebook", "YouTube"];
+const storageKey = "cloutco-social-platforms-draft";
+const contentTypes = ["Posts", "Reels", "Stories", "Live Videos"];
+const ageRanges = ["13–17", "18–24", "25–34", "35–44", "45–54", "55–64", "65+"];
+const emptyInsights = (): InstagramInsights => ({
+  period: "30",
+  overview: {
+    views: "",
+    followersPercent: "",
+    nonFollowersPercent: "",
+    netFollowers: "",
+    interactions: "",
+    viewersTotal: "",
+    postsViews: "",
+    reelsViews: "",
+    storiesViews: "",
+    liveVideosViews: "",
+    allInteractions: "",
+    postsInteractions: "",
+    reelsInteractions: "",
+    storiesInteractions: "",
+    liveVideosInteractions: "",
+    profileVisits: "",
+    bioLinkTaps: "",
+    businessAddressTaps: "",
+  },
+  audience: {
+    followers: "",
+    followerGrowth: "",
+    women: "",
+    men: "",
+    ages: Object.fromEntries(ageRanges.map((range) => [range, ""])),
+    locations: { countries: [], cities: [] },
+    topAgeRanges: [],
+    topCities: [],
+  },
+});
+const facebookViewMediaTypes = (): FacebookViewMediaType[] =>
+  ["Link", "Reel", "Photo"].map((mediaType) => ({
+    id: `views-${mediaType.toLowerCase()}`,
+    mediaType,
+    percentage: "",
+  }));
+const facebookEngagementMediaTypes = (): FacebookEngagementMediaType[] =>
+  ["Link", "Reel", "Photo"].map((mediaType) => ({
+    id: `engagement-${mediaType.toLowerCase()}`,
+    mediaType,
+    count: "",
+  }));
+const facebookMetrics = (prefix: string, names: string[]): FacebookMetric[] =>
+  names.map((name) => ({
+    id: `${prefix}-${name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
+    name,
+    value: "",
+  }));
+const emptyFacebookInsights = (): FacebookInsights => ({
+  period: "28",
+  overview: {
+    viewsTotal: "",
+    viewers: "",
+    mediaTypes: facebookViewMediaTypes(),
+    viewType: { views: "", threeSecondViews: "", oneMinuteViews: "" },
+    viewerType: { followers: "", nonFollowers: "" },
+  },
+  engagement: {
+    total: "",
+    mediaTypes: facebookEngagementMediaTypes(),
+    interactionTypes: facebookMetrics("interaction", [
+      "Reactions",
+      "Comments & replies",
+      "Shares",
+    ]),
+    newConversations: "",
+  },
+  audience: {
+    netFollowers: "",
+    women: "",
+    men: "",
+    ageGroups: facebookMetrics("age", ["18–24", "25–34", "35–44", "Other"]),
+    locations: { countries: [], cities: [] },
+  },
+});
+const emptyYouTubeInsights = (): YouTubeInsights => ({
+  views: "",
+  likes: "",
+  shares: "",
+  topCountry: "",
+});
 const defaults: PlatformAccount[] = [
-  { id: 'instagram', platform: 'Instagram', platformName: 'Instagram', profileUrl: '', username: '', audienceCount: '', isPrimary: true, instagramInsights: emptyInsights() },
-  { id: 'youtube', platform: 'YouTube', platformName: 'YouTube', profileUrl: '', username: '', audienceCount: '', isPrimary: false, youtubeInsights: emptyYouTubeInsights() },
+  {
+    id: "instagram",
+    platform: "Instagram",
+    platformName: "Instagram",
+    profileUrl: "",
+    username: "",
+    audienceCount: "",
+    isPrimary: true,
+    instagramInsights: emptyInsights(),
+  },
+  {
+    id: "youtube",
+    platform: "YouTube",
+    platformName: "YouTube",
+    profileUrl: "",
+    username: "",
+    audienceCount: "",
+    isPrimary: false,
+    youtubeInsights: emptyYouTubeInsights(),
+  },
 ];
 
 function normaliseInsights(value?: InstagramInsights): InstagramInsights {
   const base = emptyInsights();
-  const legacyAudience = value?.audience as (InstagramInsights['audience'] & { activeTimes?: unknown }) | undefined;
-  const { activeTimes: _legacyActiveTimes, ...storedAudience } = legacyAudience || {};
-  const audience = storedAudience as Partial<InstagramInsights['audience']>;
-  return { period: '30', overview: { ...base.overview, ...value?.overview }, audience: { ...base.audience, ...audience, ages: { ...base.audience.ages, ...audience.ages }, locations: { ...base.audience.locations, ...audience.locations }, topAgeRanges: Array.isArray(audience.topAgeRanges) ? audience.topAgeRanges : [], topCities: Array.isArray(audience.topCities) ? audience.topCities : [] } };
+  const legacyAudience = value?.audience as
+    | (InstagramInsights["audience"] & { activeTimes?: unknown })
+    | undefined;
+  const { activeTimes: _legacyActiveTimes, ...storedAudience } =
+    legacyAudience || {};
+  const audience = storedAudience as Partial<InstagramInsights["audience"]>;
+  return {
+    period: "30",
+    overview: { ...base.overview, ...value?.overview },
+    audience: {
+      ...base.audience,
+      ...audience,
+      ages: { ...base.audience.ages, ...audience.ages },
+      locations: { ...base.audience.locations, ...audience.locations },
+      topAgeRanges: Array.isArray(audience.topAgeRanges)
+        ? audience.topAgeRanges
+        : [],
+      topCities: Array.isArray(audience.topCities) ? audience.topCities : [],
+    },
+  };
 }
 function normaliseFacebookInsights(value?: FacebookInsights): FacebookInsights {
   const base = emptyFacebookInsights();
-  const { viewerType: _legacyEngagementViewerType, ...sanitisedEngagement } = (value?.engagement ?? {}) as FacebookInsights['engagement'] & { viewerType?: unknown };
+  const { viewerType: _legacyEngagementViewerType, ...sanitisedEngagement } =
+    (value?.engagement ?? {}) as FacebookInsights["engagement"] & {
+      viewerType?: unknown;
+    };
   return {
-    period: '28',
-    overview: { ...base.overview, ...value?.overview, viewType: { ...base.overview.viewType, ...value?.overview?.viewType }, viewerType: { ...base.overview.viewerType, ...value?.overview?.viewerType }, mediaTypes: value?.overview?.mediaTypes?.map((item) => { const legacy = item as FacebookViewMediaType & { name?: string; value?: string }; return { id: item.id, mediaType: item.mediaType || legacy.name || '', percentage: item.percentage || legacy.value || '' }; }) || base.overview.mediaTypes },
-    engagement: { ...base.engagement, ...sanitisedEngagement, mediaTypes: value?.engagement?.mediaTypes?.map((item) => { const legacy = item as FacebookEngagementMediaType & { name?: string; value?: string }; return { id: item.id, mediaType: item.mediaType || legacy.name || '', count: item.count || legacy.value || '' }; }) || base.engagement.mediaTypes, interactionTypes: value?.engagement?.interactionTypes || base.engagement.interactionTypes },
-    audience: { ...base.audience, ...value?.audience, ageGroups: value?.audience?.ageGroups || base.audience.ageGroups, locations: { ...base.audience.locations, ...value?.audience?.locations }, topAgeGroup: value?.audience?.topAgeGroup || '', topCities: Array.isArray(value?.audience?.topCities) ? value.audience.topCities : [] },
+    period: "28",
+    overview: {
+      ...base.overview,
+      ...value?.overview,
+      viewType: { ...base.overview.viewType, ...value?.overview?.viewType },
+      viewerType: {
+        ...base.overview.viewerType,
+        ...value?.overview?.viewerType,
+      },
+      mediaTypes:
+        value?.overview?.mediaTypes?.map((item) => {
+          const legacy = item as FacebookViewMediaType & {
+            name?: string;
+            value?: string;
+          };
+          return {
+            id: item.id,
+            mediaType: item.mediaType || legacy.name || "",
+            percentage: item.percentage || legacy.value || "",
+          };
+        }) || base.overview.mediaTypes,
+    },
+    engagement: {
+      ...base.engagement,
+      ...sanitisedEngagement,
+      mediaTypes:
+        value?.engagement?.mediaTypes?.map((item) => {
+          const legacy = item as FacebookEngagementMediaType & {
+            name?: string;
+            value?: string;
+          };
+          return {
+            id: item.id,
+            mediaType: item.mediaType || legacy.name || "",
+            count: item.count || legacy.value || "",
+          };
+        }) || base.engagement.mediaTypes,
+      interactionTypes:
+        value?.engagement?.interactionTypes || base.engagement.interactionTypes,
+    },
+    audience: {
+      ...base.audience,
+      ...value?.audience,
+      ageGroups: value?.audience?.ageGroups || base.audience.ageGroups,
+      locations: { ...base.audience.locations, ...value?.audience?.locations },
+      topAgeGroup: value?.audience?.topAgeGroup || "",
+      topCities: Array.isArray(value?.audience?.topCities)
+        ? value.audience.topCities
+        : [],
+    },
   };
 }
-function normaliseYouTubeInsights(value?: YouTubeInsights): YouTubeInsights { return { ...emptyYouTubeInsights(), ...value }; }
-function isNumber(value: string) { return value.trim() !== '' && Number.isFinite(Number(value)) && Number(value) >= 0; }
-function isWholeNumber(value: string) { return /^\d+$/.test(value.trim()); }
-function isPercentageValue(value: string) { return value.trim() !== '' && Number.isFinite(Number(value)) && Number(value) >= 0 && Number(value) <= 100; }
-function sanitiseNumeric(value: string) { return value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1'); }
+function normaliseYouTubeInsights(value?: YouTubeInsights): YouTubeInsights {
+  return { ...emptyYouTubeInsights(), ...value };
+}
+function isNumber(value: string) {
+  return (
+    value.trim() !== "" && Number.isFinite(Number(value)) && Number(value) >= 0
+  );
+}
+function isWholeNumber(value: string) {
+  return /^\d+$/.test(value.trim());
+}
+function isPercentageValue(value: string) {
+  return (
+    value.trim() !== "" &&
+    Number.isFinite(Number(value)) &&
+    Number(value) >= 0 &&
+    Number(value) <= 100
+  );
+}
+function sanitiseNumeric(value: string) {
+  return value.replace(/[^0-9.]/g, "").replace(/(\..*)\./g, "$1");
+}
 
-type IconName = 'home' | 'user' | 'message' | 'settings' | 'bell' | 'check' | 'plus' | 'arrow' | 'lightbulb' | 'link' | 'book' | 'trash';
+type IconName =
+  | "home"
+  | "user"
+  | "message"
+  | "settings"
+  | "bell"
+  | "check"
+  | "plus"
+  | "arrow"
+  | "lightbulb"
+  | "link"
+  | "book"
+  | "trash";
 function Icon({ name }: { name: IconName }) {
   const paths: Record<IconName, ReactNode> = {
-    home: <><path d="m3.5 10 8.5-7 8.5 7" /><path d="M5.5 9v10h13V9M9.5 19v-5h5v5" /></>, user: <><circle cx="12" cy="8" r="3" /><path d="M5 20c.5-3.4 2.8-5 7-5s6.5 1.6 7 5" /></>, message: <><path d="M5 6.5h14v9H9l-4 3v-12Z" /><path d="M8 10h8M8 13h5" /></>, settings: <><circle cx="12" cy="12" r="3" /><path d="M19 13.2a7.6 7.6 0 0 0 0-2.4l2-1.5-2-3.4-2.4 1a8 8 0 0 0-2-1.2L14.3 3h-4.6l-.4 2.7a8 8 0 0 0-2 1.2l-2.4-1-2 3.4 2 1.5a7.6 7.6 0 0 0 0 2.4l-2 1.5 2 3.4 2.4-1a8 8 0 0 0 2 1.2l.4 2.7h4.6l.4-2.7a8 8 0 0 0 2 1.2l2.4 1 2-3.4-2-1.5Z" /></>, bell: <><path d="M6.5 16.5h11l-1.2-1.8V10a4.3 4.3 0 0 0-8.6 0v4.7l-1.2 1.8Z" /><path d="M10 19h4" /></>, check: <><circle cx="12" cy="12" r="8.5" /><path d="m8.5 12 2.2 2.2 4.8-5" /></>, plus: <><path d="M12 5v14M5 12h14" /></>, arrow: <><path d="M4 12h15" /><path d="m13 6 6 6-6 6" /></>, lightbulb: <><path d="M9 18h6M10 21h4" /><path d="M8.2 15.6C6.8 14.4 6 12.7 6 11a6 6 0 1 1 12 0c0 1.7-.8 3.4-2.2 4.6-.6.5-.8 1.1-.8 1.8H9c0-.7-.2-1.3-.8-1.8Z" /></>, link: <><path d="M10.2 13.8a4 4 0 0 0 5.7 0l2.3-2.3a4 4 0 0 0-5.7-5.7l-1.3 1.3" /><path d="M13.8 10.2a4 4 0 0 0-5.7 0l-2.3 2.3a4 4 0 0 0 5.7 5.7l1.3-1.3" /></>, book: <><path d="M5 4.5h9a3 3 0 0 1 3 3V20H8a3 3 0 0 0-3 3V4.5Z" /><path d="M5 20h9a3 3 0 0 1 3 3" /></>, trash: <><path d="M5 7h14M9 7V4h6v3m-8 0 1 13h8l1-13" /></>,
+    home: (
+      <>
+        <path d="m3.5 10 8.5-7 8.5 7" />
+        <path d="M5.5 9v10h13V9M9.5 19v-5h5v5" />
+      </>
+    ),
+    user: (
+      <>
+        <circle cx="12" cy="8" r="3" />
+        <path d="M5 20c.5-3.4 2.8-5 7-5s6.5 1.6 7 5" />
+      </>
+    ),
+    message: (
+      <>
+        <path d="M5 6.5h14v9H9l-4 3v-12Z" />
+        <path d="M8 10h8M8 13h5" />
+      </>
+    ),
+    settings: (
+      <>
+        <circle cx="12" cy="12" r="3" />
+        <path d="M19 13.2a7.6 7.6 0 0 0 0-2.4l2-1.5-2-3.4-2.4 1a8 8 0 0 0-2-1.2L14.3 3h-4.6l-.4 2.7a8 8 0 0 0-2 1.2l-2.4-1-2 3.4 2 1.5a7.6 7.6 0 0 0 0 2.4l-2 1.5 2 3.4 2.4-1a8 8 0 0 0 2 1.2l.4 2.7h4.6l.4-2.7a8 8 0 0 0 2 1.2l2.4 1 2-3.4-2-1.5Z" />
+      </>
+    ),
+    bell: (
+      <>
+        <path d="M6.5 16.5h11l-1.2-1.8V10a4.3 4.3 0 0 0-8.6 0v4.7l-1.2 1.8Z" />
+        <path d="M10 19h4" />
+      </>
+    ),
+    check: (
+      <>
+        <circle cx="12" cy="12" r="8.5" />
+        <path d="m8.5 12 2.2 2.2 4.8-5" />
+      </>
+    ),
+    plus: (
+      <>
+        <path d="M12 5v14M5 12h14" />
+      </>
+    ),
+    arrow: (
+      <>
+        <path d="M4 12h15" />
+        <path d="m13 6 6 6-6 6" />
+      </>
+    ),
+    lightbulb: (
+      <>
+        <path d="M9 18h6M10 21h4" />
+        <path d="M8.2 15.6C6.8 14.4 6 12.7 6 11a6 6 0 1 1 12 0c0 1.7-.8 3.4-2.2 4.6-.6.5-.8 1.1-.8 1.8H9c0-.7-.2-1.3-.8-1.8Z" />
+      </>
+    ),
+    link: (
+      <>
+        <path d="M10.2 13.8a4 4 0 0 0 5.7 0l2.3-2.3a4 4 0 0 0-5.7-5.7l-1.3 1.3" />
+        <path d="M13.8 10.2a4 4 0 0 0-5.7 0l-2.3 2.3a4 4 0 0 0 5.7 5.7l1.3-1.3" />
+      </>
+    ),
+    book: (
+      <>
+        <path d="M5 4.5h9a3 3 0 0 1 3 3V20H8a3 3 0 0 0-3 3V4.5Z" />
+        <path d="M5 20h9a3 3 0 0 1 3 3" />
+      </>
+    ),
+    trash: (
+      <>
+        <path d="M5 7h14M9 7V4h6v3m-8 0 1 13h8l1-13" />
+      </>
+    ),
   };
-  return <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5 fill-none stroke-current stroke-[1.65]">{paths[name]}</svg>;
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      className="h-5 w-5 fill-none stroke-current stroke-[1.65]"
+    >
+      {paths[name]}
+    </svg>
+  );
 }
-function BrandGlyph({ platform }: { platform: Platform }) { if (platform === 'Instagram') return <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5"><rect x="3" y="3" width="18" height="18" rx="5" fill="none" stroke="currentColor" strokeWidth="2" /><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" strokeWidth="2" /><circle cx="17.5" cy="6.8" r="1.15" fill="currentColor" /></svg>; if (platform === 'Facebook') return <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5 fill-current"><path d="M13.8 21v-8h2.8l.5-3h-3.3V8.1c0-.9.3-1.5 1.6-1.5h1.8V3.9c-.3 0-1.4-.1-2.6-.1-2.6 0-4.4 1.6-4.4 4.5V10H7.4v3h2.8v8h3.6Z" /></svg>; return <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5 fill-current"><path d="M21.6 7.2a3.2 3.2 0 0 0-2.2-2.3C17.4 4.4 12 4.4 12 4.4s-5.4 0-7.4.5a3.2 3.2 0 0 0-2.2 2.3C2 9.2 2 12 2 12s0 2.8.4 4.8a3.2 3.2 0 0 0 2.2 2.3c2 .5 7.4.5 7.4.5s5.4 0 7.4-.5a3.2 3.2 0 0 0 2.2-2.3c.4-2 .4-4.8.4-4.8s0-2.8-.4-4.8ZM10 15.5v-7l6 3.5-6 3.5Z" /></svg>; }
-function PlatformMark({ platform }: { platform: Platform }) { const colors: Record<Platform, string> = { Instagram: 'bg-[#c6328b]', Facebook: 'bg-[#1877f2]', YouTube: 'bg-[#ef2323]' }; return <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl text-white ${colors[platform]}`}><BrandGlyph platform={platform} /></span>; }
-function FieldError({ children }: { children?: string }) { return children ? <p role="alert" className="mt-3 text-sm font-medium text-[#b22836]">{children}</p> : null; }
-function NumberInput({ label, value, onChange, required, percent = false, placeholder = 'Enter value', labelClassName = '' }: { label: string; value: string; onChange: (value: string) => void; required?: boolean; percent?: boolean; placeholder?: string; labelClassName?: string }) { return <label className="block"><span className={`text-sm font-semibold ${labelClassName}`}>{label}{required && <span className="text-[#6a35df]"> *</span>}</span><div className="relative mt-2"><input value={value} inputMode="decimal" onChange={(event) => onChange(sanitiseNumeric(event.target.value))} placeholder={placeholder} className="min-h-11 w-full rounded-lg border border-[#dfe1e8] bg-white px-3.5 pr-9 text-sm outline-none focus:border-[#8760df]" />{percent && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-[#747b89]">%</span>}</div></label>; }
-function PercentageTotal({ values }: { values: string[] }) { const total = values.reduce((sum, value) => sum + (Number.isFinite(Number(value)) && value.trim() ? Number(value) : 0), 0); const display = Number.isInteger(total) ? total.toString() : total.toFixed(2).replace(/0+$/, '').replace(/\.$/, ''); return <p className="mt-3 text-sm text-[#687082]">Total: {display}%</p>; }
-function SectionCard({ number, title, description, children }: { number: string; title: string; description: string; children: ReactNode }) {
-  const instruction = title === 'Overview (Insights)'
-    ? description.startsWith('Copy the values shown in Instagram')
-      ? 'Open your Instagram profile in the app → tap Professional Dashboard → open Insights. Enter data for the last 30 days in the form below.'
-      : 'Open your Facebook Page in the app → open Professional Dashboard → tap Insights. Enter data for the last 28 days in the form below.'
-    : title === 'YouTube Insights'
-      ? 'Open your YouTube channel in the YouTube app → tap Analytics below your channel picture. Enter the latest data shown in your YouTube Analytics.'
-      : null;
+function BrandGlyph({ platform }: { platform: Platform }) {
+  if (platform === "Instagram")
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5">
+        <rect
+          x="3"
+          y="3"
+          width="18"
+          height="18"
+          rx="5"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+        />
+        <circle
+          cx="12"
+          cy="12"
+          r="4"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+        />
+        <circle cx="17.5" cy="6.8" r="1.15" fill="currentColor" />
+      </svg>
+    );
+  if (platform === "Facebook")
+    return (
+      <svg
+        viewBox="0 0 24 24"
+        aria-hidden="true"
+        className="h-5 w-5 fill-current"
+      >
+        <path d="M13.8 21v-8h2.8l.5-3h-3.3V8.1c0-.9.3-1.5 1.6-1.5h1.8V3.9c-.3 0-1.4-.1-2.6-.1-2.6 0-4.4 1.6-4.4 4.5V10H7.4v3h2.8v8h3.6Z" />
+      </svg>
+    );
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      className="h-5 w-5 fill-current"
+    >
+      <path d="M21.6 7.2a3.2 3.2 0 0 0-2.2-2.3C17.4 4.4 12 4.4 12 4.4s-5.4 0-7.4.5a3.2 3.2 0 0 0-2.2 2.3C2 9.2 2 12 2 12s0 2.8.4 4.8a3.2 3.2 0 0 0 2.2 2.3c2 .5 7.4.5 7.4.5s5.4 0 7.4-.5a3.2 3.2 0 0 0 2.2-2.3c.4-2 .4-4.8.4-4.8s0-2.8-.4-4.8ZM10 15.5v-7l6 3.5-6 3.5Z" />
+    </svg>
+  );
+}
+function PlatformMark({ platform }: { platform: Platform }) {
+  const colors: Record<Platform, string> = {
+    Instagram: "bg-[#c6328b]",
+    Facebook: "bg-[#1877f2]",
+    YouTube: "bg-[#ef2323]",
+  };
+  return (
+    <span
+      className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl text-white ${colors[platform]}`}
+    >
+      <BrandGlyph platform={platform} />
+    </span>
+  );
+}
+function FieldError({ children }: { children?: string }) {
+  return children ? (
+    <p role="alert" className="mt-3 text-sm font-medium text-[#b22836]">
+      {children}
+    </p>
+  ) : null;
+}
+function NumberInput({
+  label,
+  value,
+  onChange,
+  required,
+  percent = false,
+  placeholder = "Enter value",
+  labelClassName = "",
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  required?: boolean;
+  percent?: boolean;
+  placeholder?: string;
+  labelClassName?: string;
+}) {
+  return (
+    <label className="block">
+      <span className={`text-sm font-semibold ${labelClassName}`}>
+        {label}
+        {required && <span className="text-[#6a35df]"> *</span>}
+      </span>
+      <div className="relative mt-2">
+        <input
+          value={value}
+          inputMode="decimal"
+          onChange={(event) => onChange(sanitiseNumeric(event.target.value))}
+          placeholder={placeholder}
+          className="min-h-11 w-full rounded-lg border border-[#dfe1e8] bg-white px-3.5 pr-9 text-sm outline-none focus:border-[#8760df]"
+        />
+        {percent && (
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-[#747b89]">
+            %
+          </span>
+        )}
+      </div>
+    </label>
+  );
+}
+function PercentageTotal({ values }: { values: string[] }) {
+  const total = values.reduce(
+    (sum, value) =>
+      sum +
+      (Number.isFinite(Number(value)) && value.trim() ? Number(value) : 0),
+    0,
+  );
+  const display = Number.isInteger(total)
+    ? total.toString()
+    : total.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
+  return <p className="mt-3 text-sm text-[#687082]">Total: {display}%</p>;
+}
+function SectionCard({
+  number,
+  title,
+  description,
+  children,
+}: {
+  number: string;
+  title: string;
+  description: string;
+  children: ReactNode;
+}) {
+  const instruction =
+    title === "Overview (Insights)"
+      ? description.startsWith("Copy the values shown in Instagram")
+        ? "Open your Instagram profile in the app → tap Professional Dashboard → open Insights. Enter data for the last 30 days in the form below."
+        : "Open your Facebook Page in the app → open Professional Dashboard → tap Insights. Enter data for the last 28 days in the form below."
+      : title === "YouTube Insights"
+        ? "Open your YouTube channel in the YouTube app → tap Analytics below your channel picture. Enter the latest data shown in your YouTube Analytics."
+        : null;
 
-  return <section className="rounded-2xl border border-[#e7e4ec] bg-white p-5 shadow-[0_5px_18px_rgba(50,40,80,0.025)] sm:p-6"><div className="flex gap-4"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#f0eaff] text-sm font-semibold text-[#6430dc]">{number}</span><div><h2 className="text-lg font-semibold tracking-[-0.03em]">{title}</h2><p className="mt-1 text-sm leading-5 text-[#677082]">{description}</p></div></div><div className="mt-6">{instruction && <div className="mb-5"><ImportantInstruction>{instruction}</ImportantInstruction></div>}{children}</div></section>;
+  return (
+    <section className="rounded-2xl border border-[#e7e4ec] bg-white p-5 shadow-[0_5px_18px_rgba(50,40,80,0.025)] sm:p-6">
+      <div className="flex gap-4">
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#f0eaff] text-sm font-semibold text-[#6430dc]">
+          {number}
+        </span>
+        <div>
+          <h2 className="text-lg font-semibold tracking-[-0.03em]">{title}</h2>
+          <p className="mt-1 text-sm leading-5 text-[#677082]">{description}</p>
+        </div>
+      </div>
+      <div className="mt-6">
+        {instruction && (
+          <div className="mb-5">
+            <ImportantInstruction>{instruction}</ImportantInstruction>
+          </div>
+        )}
+        {children}
+      </div>
+    </section>
+  );
 }
 
-function ImportantInstruction({ children }: { children: ReactNode }) { return <div role="note" className="flex gap-3 rounded-xl border border-[#d9c8f4] bg-[#f6f0ff] p-4 text-sm leading-6 text-[#332a42]"><span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-white text-[#6530dc]"><Icon name="lightbulb" /></span><p className="min-w-0"><strong>Important:</strong> {children}</p></div>; }
+function ImportantInstruction({ children }: { children: ReactNode }) {
+  return (
+    <div
+      role="note"
+      className="flex gap-3 rounded-xl border border-[#d9c8f4] bg-[#f6f0ff] p-4 text-sm leading-6 text-[#332a42]"
+    >
+      <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-white text-[#6530dc]">
+        <Icon name="lightbulb" />
+      </span>
+      <p className="min-w-0">
+        <strong>Important:</strong> {children}
+      </p>
+    </div>
+  );
+}
 
-function LocationAutocomplete({ location, locations, tab, onChange }: { location: InsightLocation; locations: InsightLocation[]; tab: 'countries' | 'cities'; onChange: (value: string) => void }) {
+function LocationAutocomplete({
+  location,
+  locations,
+  tab,
+  onChange,
+}: {
+  location: InsightLocation;
+  locations: InsightLocation[];
+  tab: "countries" | "cities";
+  onChange: (value: string) => void;
+}) {
   const [isOpen, setIsOpen] = useState(false);
-  const [countryOptions, setCountryOptions] = useState<LocationSuggestion[] | null>(null);
-  const [cityOptions, setCityOptions] = useState<LocationSuggestion[] | null>(null);
+  const [countryOptions, setCountryOptions] = useState<
+    LocationSuggestion[] | null
+  >(null);
+  const [cityOptions, setCityOptions] = useState<LocationSuggestion[] | null>(
+    null,
+  );
 
   useEffect(() => {
     if (!isOpen) return;
-    if (tab === 'countries' && !countryOptions) {
-      void import('country-state-city').then(({ Country }) => setCountryOptions((Country.getAllCountries() || []).map((country) => ({ value: country.name, detail: country.isoCode }))));
+    if (tab === "countries" && !countryOptions) {
+      void import("country-state-city").then(({ Country }) =>
+        setCountryOptions(
+          (Country.getAllCountries() || []).map((country) => ({
+            value: country.name,
+            detail: country.isoCode,
+          })),
+        ),
+      );
     }
-    if (tab === 'cities' && !cityOptions) {
-      void import('country-state-city').then(({ City, State }) => {
-        const states = new Map((State.getStatesOfCountry('IN') || []).map((state) => [state.isoCode, state.name]));
-        setCityOptions((City.getCitiesOfCountry('IN') || []).map((city) => ({ value: city.name, detail: states.get(city.stateCode) || city.stateCode || 'India' })));
+    if (tab === "cities" && !cityOptions) {
+      void import("country-state-city").then(({ City, State }) => {
+        const states = new Map(
+          (State.getStatesOfCountry("IN") || []).map((state) => [
+            state.isoCode,
+            state.name,
+          ]),
+        );
+        setCityOptions(
+          (City.getCitiesOfCountry("IN") || []).map((city) => ({
+            value: city.name,
+            detail: states.get(city.stateCode) || city.stateCode || "India",
+          })),
+        );
       });
     }
   }, [cityOptions, countryOptions, isOpen, tab]);
 
   const suggestions = useMemo(() => {
-    const query = location.name.trim().toLocaleLowerCase('en-IN');
-    const options = tab === 'countries' ? countryOptions : cityOptions;
+    const query = location.name.trim().toLocaleLowerCase("en-IN");
+    const options = tab === "countries" ? countryOptions : cityOptions;
     if (!query || !options) return [];
     const score = (option: LocationSuggestion) => {
-      const value = option.value.toLocaleLowerCase('en-IN');
+      const value = option.value.toLocaleLowerCase("en-IN");
       if (value === query) return 0;
       return value.startsWith(query) ? 1 : 2;
     };
     return options
-      .filter((option) => `${option.value} ${option.detail || ''}`.toLocaleLowerCase('en-IN').includes(query))
-      .filter((option) => !locations.some((item) => item.id !== location.id && item.name.trim().toLocaleLowerCase('en-IN') === option.value.toLocaleLowerCase('en-IN')))
-      .sort((left, right) => score(left) - score(right) || left.value.localeCompare(right.value, 'en-IN'))
+      .filter((option) =>
+        `${option.value} ${option.detail || ""}`
+          .toLocaleLowerCase("en-IN")
+          .includes(query),
+      )
+      .filter(
+        (option) =>
+          !locations.some(
+            (item) =>
+              item.id !== location.id &&
+              item.name.trim().toLocaleLowerCase("en-IN") ===
+                option.value.toLocaleLowerCase("en-IN"),
+          ),
+      )
+      .sort(
+        (left, right) =>
+          score(left) - score(right) ||
+          left.value.localeCompare(right.value, "en-IN"),
+      )
       .slice(0, 8);
   }, [cityOptions, countryOptions, location, locations, tab]);
 
   const updateValue = (value: string) => {
-    if (locations.some((item) => item.id !== location.id && item.name.trim().toLocaleLowerCase('en-IN') === value.trim().toLocaleLowerCase('en-IN'))) return;
+    if (
+      locations.some(
+        (item) =>
+          item.id !== location.id &&
+          item.name.trim().toLocaleLowerCase("en-IN") ===
+            value.trim().toLocaleLowerCase("en-IN"),
+      )
+    )
+      return;
     onChange(value);
   };
 
-  return <div className="relative min-w-0"><input value={location.name} onFocus={() => setIsOpen(true)} onBlur={() => window.setTimeout(() => setIsOpen(false), 150)} onChange={(event) => updateValue(event.target.value)} placeholder={tab === 'countries' ? 'Country' : 'City / Town'} autoComplete="off" className="min-h-10 w-full rounded-lg border border-[#dfe1e8] px-3 text-sm outline-none focus:border-[#8760df]" />{isOpen && location.name.trim() && <div className="absolute left-0 top-full z-30 mt-1 max-h-52 w-full overflow-y-auto rounded-lg border border-[#ded7eb] bg-white p-1 shadow-[0_10px_24px_rgba(54,38,90,0.14)]">{suggestions.length ? suggestions.map((option) => <button key={`${option.value}-${option.detail || ''}`} type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => { updateValue(option.value); setIsOpen(false); }} className="block w-full rounded-md px-3 py-2 text-left text-sm hover:bg-[#f5f1ff]"><span className="block font-medium text-[#292532]">{option.value}</span>{option.detail && <span className="mt-0.5 block text-xs text-[#71798a]">{option.detail}</span>}</button>) : <p className="px-3 py-2 text-sm text-[#71798a]">No matching {tab === 'countries' ? 'country' : 'Indian city or town'} found.</p>}</div>}</div>;
+  return (
+    <div className="relative min-w-0">
+      <input
+        value={location.name}
+        onFocus={() => setIsOpen(true)}
+        onBlur={() => window.setTimeout(() => setIsOpen(false), 150)}
+        onChange={(event) => updateValue(event.target.value)}
+        placeholder={tab === "countries" ? "Country" : "City / Town"}
+        autoComplete="off"
+        className="min-h-10 w-full rounded-lg border border-[#dfe1e8] px-3 text-sm outline-none focus:border-[#8760df]"
+      />
+      {isOpen && location.name.trim() && (
+        <div className="absolute left-0 top-full z-30 mt-1 max-h-52 w-full overflow-y-auto rounded-lg border border-[#ded7eb] bg-white p-1 shadow-[0_10px_24px_rgba(54,38,90,0.14)]">
+          {suggestions.length ? (
+            suggestions.map((option) => (
+              <button
+                key={`${option.value}-${option.detail || ""}`}
+                type="button"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => {
+                  updateValue(option.value);
+                  setIsOpen(false);
+                }}
+                className="block w-full rounded-md px-3 py-2 text-left text-sm hover:bg-[#f5f1ff]"
+              >
+                <span className="block font-medium text-[#292532]">
+                  {option.value}
+                </span>
+                {option.detail && (
+                  <span className="mt-0.5 block text-xs text-[#71798a]">
+                    {option.detail}
+                  </span>
+                )}
+              </button>
+            ))
+          ) : (
+            <p className="px-3 py-2 text-sm text-[#71798a]">
+              No matching{" "}
+              {tab === "countries" ? "country" : "Indian city or town"} found.
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
-function LegacyInstagramEditor({ account, errors, onChange, onPrimaryToggle, onRemoveRequest }: { account: PlatformAccount; errors: FieldErrors; onChange: (changes: Partial<PlatformAccount>) => void; onPrimaryToggle: (checked: boolean) => void; onRemoveRequest: () => void }) {
+function LegacyInstagramEditor({
+  account,
+  errors,
+  onChange,
+  onPrimaryToggle,
+  onRemoveRequest,
+}: {
+  account: PlatformAccount;
+  errors: FieldErrors;
+  onChange: (changes: Partial<PlatformAccount>) => void;
+  onPrimaryToggle: (checked: boolean) => void;
+  onRemoveRequest: () => void;
+}) {
   const insights = normaliseInsights(account.instagramInsights);
-  const [locationTab, setLocationTab] = useState<'countries' | 'cities'>('countries');
+  const [locationTab, setLocationTab] = useState<"countries" | "cities">(
+    "countries",
+  );
   const [isExpanded, setIsExpanded] = useState(true);
-  const update = (next: Partial<InstagramInsights>) => onChange({ instagramInsights: { ...insights, ...next } });
-  const updateOverview = (key: string, value: string) => update({ overview: { ...insights.overview, [key]: value } });
-  const updateAudience = (next: Partial<InstagramInsights['audience']>) => update({ audience: { ...insights.audience, ...next } });
-  const updateLocation = (index: number, key: 'name' | 'percentage', value: string) => { const list = insights.audience.locations[locationTab]; updateAudience({ locations: { ...insights.audience.locations, [locationTab]: list.map((item, itemIndex) => itemIndex === index ? { ...item, [key]: key === 'percentage' ? sanitiseNumeric(value) : value } : item) } }); };
-  const addLocation = () => { const list = insights.audience.locations[locationTab]; if (list.length >= 10) return; updateAudience({ locations: { ...insights.audience.locations, [locationTab]: [...list, { id: `${locationTab}-${Date.now()}`, name: '', percentage: '' }] } }); };
-  const removeLocation = (index: number) => { const list = insights.audience.locations[locationTab]; updateAudience({ locations: { ...insights.audience.locations, [locationTab]: list.filter((_, itemIndex) => itemIndex !== index) } }); };
-  const viewKeys: Record<string, string> = { Posts: 'postsViews', Reels: 'reelsViews', Stories: 'storiesViews', 'Live Videos': 'liveVideosViews' };
-  const interactionKeys: Record<string, string> = { Posts: 'postsInteractions', Reels: 'reelsInteractions', Stories: 'storiesInteractions', 'Live Videos': 'liveVideosInteractions' };
-  return <section className="rounded-2xl border border-[#e1dcef] bg-[#fcfbff] shadow-[0_8px_22px_rgba(70,45,120,0.035)]"><div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#ece8f2] p-5 sm:p-6"><div className="flex items-center gap-3"><PlatformMark platform="Instagram" /><div><div className="flex items-center gap-2"><h2 className="text-lg font-semibold">Instagram</h2>{account.isPrimary && <span className="rounded-full bg-[#f0eaff] px-2 py-0.5 text-[0.62rem] font-semibold tracking-[0.08em] text-[#6330dc]">PRIMARY</span>}</div><p className="mt-0.5 text-sm text-[#687082]">Add your Instagram profile and insights.</p></div></div><div className="flex items-center gap-1"><button type="button" onClick={onRemoveRequest} className="rounded-lg px-2.5 py-2 text-xs font-semibold text-[#a83a46] hover:bg-[#fff1f2]">Remove</button><button type="button" onClick={() => setIsExpanded((expanded) => !expanded)} aria-expanded={isExpanded} aria-label={`${isExpanded ? 'Collapse' : 'Expand'} Instagram form`} className="grid h-9 w-9 place-items-center rounded-lg text-[#625b72] hover:bg-[#f4f0fb]"><svg viewBox="0 0 24 24" aria-hidden="true" className={`h-4 w-4 fill-none stroke-current stroke-2 transition-transform ${isExpanded ? 'rotate-180' : ''}`}><path d="m7 9 5 5 5-5" /></svg></button></div></div>{isExpanded && <div className="space-y-4 p-5 sm:p-6"><SectionCard number="1" title="Profile information" description="Share your Instagram profile details."><div className="grid gap-4 sm:grid-cols-3"><label><span className="text-sm font-semibold">Profile URL <span className="text-[#6a35df]">*</span></span><input value={account.profileUrl} onChange={(event) => onChange({ profileUrl: event.target.value })} placeholder="https://instagram.com/username" className="mt-2 min-h-11 w-full rounded-lg border border-[#dfe1e8] bg-white px-3.5 text-sm outline-none focus:border-[#8760df]" /></label><label><span className="text-sm font-semibold">Username / Handle</span><input value={account.username} onChange={(event) => onChange({ username: event.target.value })} placeholder="@username" className="mt-2 min-h-11 w-full rounded-lg border border-[#dfe1e8] bg-white px-3.5 text-sm outline-none focus:border-[#8760df]" /></label><NumberInput label="Followers" required value={account.audienceCount} onChange={(value) => onChange({ audienceCount: value })} placeholder="e.g. 25000" /></div><label className="mt-5 flex cursor-pointer items-center gap-3 text-sm font-medium"><input type="checkbox" checked={account.isPrimary} onChange={(event) => onPrimaryToggle(event.target.checked)} className="h-4 w-4 rounded accent-[#6731dc]" />Set as my primary platform</label><FieldError>{errors[`${account.id}-url`] || errors[`${account.id}-count`]}</FieldError></SectionCard>{account.isPrimary && <><SectionCard number="2" title="Overview (Insights)" description="Copy the values shown in Instagram Professional Dashboard → Insights → Overview."><div className="flex justify-end"><label className="inline-flex items-center gap-2 rounded-lg border border-[#ddd8e8] bg-white px-3 py-2 text-sm font-medium"><span aria-hidden="true">◷</span><select value={insights.period} onChange={(event) => update({ period: event.target.value as InstagramInsights['period'] })} className="bg-transparent outline-none"><option value="7">Last 7 days</option><option value="30">Last 30 days</option><option value="90">Last 90 days</option></select></label></div><div className="mt-5 grid gap-4 sm:grid-cols-3"><NumberInput label="Views (All Content)" required value={insights.overview.views} onChange={(value) => updateOverview('views', value)} /><NumberInput label="% Followers" required percent value={insights.overview.followersPercent} onChange={(value) => updateOverview('followersPercent', value)} /><NumberInput label="% Non-followers" required percent value={insights.overview.nonFollowersPercent} onChange={(value) => updateOverview('nonFollowersPercent', value)} /><NumberInput label="Net Followers" required value={insights.overview.netFollowers} onChange={(value) => updateOverview('netFollowers', value)} /><NumberInput label="Interactions" required value={insights.overview.interactions} onChange={(value) => updateOverview('interactions', value)} /></div><div className="mt-7"><h3 className="text-base font-semibold">Views by content type</h3><p className="mt-1 text-sm text-[#687082]">Enter only the number of views for each content type.</p><div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><NumberInput label="Viewers (Total)" required value={insights.overview.viewersTotal} onChange={(value) => updateOverview('viewersTotal', value)} />{contentTypes.map((type) => <NumberInput key={type} label={type} required value={insights.overview[viewKeys[type]]} onChange={(value) => updateOverview(viewKeys[type], value)} />)}</div></div><div className="mt-7"><h3 className="text-base font-semibold">Interactions by content type</h3><p className="mt-1 text-sm text-[#687082]">Enter only the number of interactions for each content type.</p><div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><NumberInput label="All Interactions (Total)" required value={insights.overview.allInteractions} onChange={(value) => updateOverview('allInteractions', value)} />{contentTypes.map((type) => <NumberInput key={type} label={type} required value={insights.overview[interactionKeys[type]]} onChange={(value) => updateOverview(interactionKeys[type], value)} />)}</div></div><div className="mt-7"><h3 className="text-base font-semibold">Profile activity</h3><div className="mt-4 grid gap-4 sm:grid-cols-3"><NumberInput label="Profile Visits" required value={insights.overview.profileVisits} onChange={(value) => updateOverview('profileVisits', value)} /><NumberInput label="Bio Link Taps" required value={insights.overview.bioLinkTaps} onChange={(value) => updateOverview('bioLinkTaps', value)} /><NumberInput label="Business Address Taps" required value={insights.overview.businessAddressTaps} onChange={(value) => updateOverview('businessAddressTaps', value)} /></div></div></SectionCard><SectionCard number="3" title="Audience (Insights)" description="Copy audience information from Instagram Professional Dashboard → Insights → Audience."><div className="grid gap-6 lg:grid-cols-2"><div><h3 className="text-base font-semibold">Followers</h3><div className="mt-4 grid gap-4 sm:grid-cols-2"><NumberInput label="Followers" required labelClassName="flex min-h-10 items-start" value={insights.audience.followers} onChange={(value) => updateAudience({ followers: value })} /><NumberInput label={`Follower Growth (last ${insights.period} days)`} required labelClassName="flex min-h-10 items-start" value={insights.audience.followerGrowth} onChange={(value) => updateAudience({ followerGrowth: value })} /></div></div><div><h3 className="text-base font-semibold">Gender</h3><div className="mt-4 grid gap-4 sm:grid-cols-2"><NumberInput label="Women" percent value={insights.audience.women} onChange={(value) => updateAudience({ women: value })} /><NumberInput label="Men" percent value={insights.audience.men} onChange={(value) => updateAudience({ men: value })} /></div><PercentageTotal values={[insights.audience.women, insights.audience.men]} /></div></div><div className="mt-8 grid gap-8 lg:grid-cols-[0.85fr_1.15fr]"><div><h3 className="text-base font-semibold">Age range</h3><div className="mt-4 space-y-3">{ageRanges.map((range) => <div key={range} className="grid grid-cols-[70px_minmax(0,1fr)] items-end gap-3"><span className="pb-3 text-sm text-[#4e5667]">{range}</span><NumberInput label="" percent value={insights.audience.ages[range]} onChange={(value) => updateAudience({ ages: { ...insights.audience.ages, [range]: value } })} /></div>)}</div><PercentageTotal values={Object.values(insights.audience.ages)} /></div><div><h3 className="text-base font-semibold">Top locations</h3><div className="mt-4 flex border-b border-[#e8e4ec]"><button type="button" onClick={() => setLocationTab('countries')} className={`min-h-10 px-4 text-sm font-medium ${locationTab === 'countries' ? 'border-b-2 border-[#6731dc] text-[#6330dc]' : 'text-[#6d7482]'}`}>Countries</button><button type="button" onClick={() => setLocationTab('cities')} className={`min-h-10 px-4 text-sm font-medium ${locationTab === 'cities' ? 'border-b-2 border-[#6731dc] text-[#6330dc]' : 'text-[#6d7482]'}`}>Cities / Towns</button></div><div className="mt-4 space-y-3">{insights.audience.locations[locationTab].map((location, index) => <div key={location.id} className="grid grid-cols-[minmax(0,1fr)_110px_auto] gap-2"><LocationAutocomplete location={location} locations={insights.audience.locations[locationTab]} tab={locationTab} onChange={(value) => updateLocation(index, 'name', value)} /><div className="relative"><input value={location.percentage} inputMode="decimal" onChange={(event) => updateLocation(index, 'percentage', event.target.value)} placeholder="Percent" className="min-h-10 w-full rounded-lg border border-[#dfe1e8] px-3 pr-7 text-sm outline-none focus:border-[#8760df]" /><span className="absolute right-2.5 top-2.5 text-xs text-[#747b89]">%</span></div><button type="button" onClick={() => removeLocation(index)} aria-label="Remove location" className="rounded-lg p-2 text-[#7d7285] hover:bg-[#f8f5fc]"><Icon name="trash" /></button></div>)}</div><PercentageTotal values={insights.audience.locations[locationTab].map((location) => location.percentage)} /><button type="button" onClick={addLocation} disabled={insights.audience.locations[locationTab].length >= 10} className="mt-4 inline-flex min-h-10 items-center gap-2 rounded-lg bg-[#f3efff] px-3.5 text-sm font-semibold text-[#6330dc] disabled:opacity-50"><Icon name="plus" />Add location (up to 10)</button></div></div></SectionCard></>}<FieldError>{errors[`${account.id}-instagram`]}</FieldError></div>}</section>;
+  const update = (next: Partial<InstagramInsights>) =>
+    onChange({ instagramInsights: { ...insights, ...next } });
+  const updateOverview = (key: string, value: string) =>
+    update({ overview: { ...insights.overview, [key]: value } });
+  const updateAudience = (next: Partial<InstagramInsights["audience"]>) =>
+    update({ audience: { ...insights.audience, ...next } });
+  const updateLocation = (
+    index: number,
+    key: "name" | "percentage",
+    value: string,
+  ) => {
+    const list = insights.audience.locations[locationTab];
+    updateAudience({
+      locations: {
+        ...insights.audience.locations,
+        [locationTab]: list.map((item, itemIndex) =>
+          itemIndex === index
+            ? {
+                ...item,
+                [key]: key === "percentage" ? sanitiseNumeric(value) : value,
+              }
+            : item,
+        ),
+      },
+    });
+  };
+  const addLocation = () => {
+    const list = insights.audience.locations[locationTab];
+    if (list.length >= 10) return;
+    updateAudience({
+      locations: {
+        ...insights.audience.locations,
+        [locationTab]: [
+          ...list,
+          { id: `${locationTab}-${Date.now()}`, name: "", percentage: "" },
+        ],
+      },
+    });
+  };
+  const removeLocation = (index: number) => {
+    const list = insights.audience.locations[locationTab];
+    updateAudience({
+      locations: {
+        ...insights.audience.locations,
+        [locationTab]: list.filter((_, itemIndex) => itemIndex !== index),
+      },
+    });
+  };
+  const viewKeys: Record<string, string> = {
+    Posts: "postsViews",
+    Reels: "reelsViews",
+    Stories: "storiesViews",
+    "Live Videos": "liveVideosViews",
+  };
+  const interactionKeys: Record<string, string> = {
+    Posts: "postsInteractions",
+    Reels: "reelsInteractions",
+    Stories: "storiesInteractions",
+    "Live Videos": "liveVideosInteractions",
+  };
+  return (
+    <section className="rounded-2xl border border-[#e1dcef] bg-[#fcfbff] shadow-[0_8px_22px_rgba(70,45,120,0.035)]">
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#ece8f2] p-5 sm:p-6">
+        <div className="flex items-center gap-3">
+          <PlatformMark platform="Instagram" />
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-semibold">Instagram</h2>
+              {account.isPrimary && (
+                <span className="rounded-full bg-[#f0eaff] px-2 py-0.5 text-[0.62rem] font-semibold tracking-[0.08em] text-[#6330dc]">
+                  PRIMARY
+                </span>
+              )}
+            </div>
+            <p className="mt-0.5 text-sm text-[#687082]">
+              Add your Instagram profile and insights.
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={onRemoveRequest}
+            className="rounded-lg px-2.5 py-2 text-xs font-semibold text-[#a83a46] hover:bg-[#fff1f2]"
+          >
+            Remove
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsExpanded((expanded) => !expanded)}
+            aria-expanded={isExpanded}
+            aria-label={`${isExpanded ? "Collapse" : "Expand"} Instagram form`}
+            className="grid h-9 w-9 place-items-center rounded-lg text-[#625b72] hover:bg-[#f4f0fb]"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+              className={`h-4 w-4 fill-none stroke-current stroke-2 transition-transform ${isExpanded ? "rotate-180" : ""}`}
+            >
+              <path d="m7 9 5 5 5-5" />
+            </svg>
+          </button>
+        </div>
+      </div>
+      {isExpanded && (
+        <div className="space-y-4 p-5 sm:p-6">
+          <SectionCard
+            number="1"
+            title="Profile information"
+            description="Share your Instagram profile details."
+          >
+            <div className="grid gap-4 sm:grid-cols-3">
+              <label>
+                <span className="text-sm font-semibold">
+                  Profile URL <span className="text-[#6a35df]">*</span>
+                </span>
+                <input
+                  value={account.profileUrl}
+                  onChange={(event) =>
+                    onChange({ profileUrl: event.target.value })
+                  }
+                  placeholder="https://instagram.com/username"
+                  className="mt-2 min-h-11 w-full rounded-lg border border-[#dfe1e8] bg-white px-3.5 text-sm outline-none focus:border-[#8760df]"
+                />
+              </label>
+              <label>
+                <span className="text-sm font-semibold">Username / Handle</span>
+                <input
+                  value={account.username}
+                  onChange={(event) =>
+                    onChange({ username: event.target.value })
+                  }
+                  placeholder="@username"
+                  className="mt-2 min-h-11 w-full rounded-lg border border-[#dfe1e8] bg-white px-3.5 text-sm outline-none focus:border-[#8760df]"
+                />
+              </label>
+              <NumberInput
+                label="Followers"
+                required
+                value={account.audienceCount}
+                onChange={(value) => onChange({ audienceCount: value })}
+                placeholder="e.g. 25000"
+              />
+            </div>
+            <label className="mt-5 flex cursor-pointer items-center gap-3 text-sm font-medium">
+              <input
+                type="checkbox"
+                checked={account.isPrimary}
+                onChange={(event) => onPrimaryToggle(event.target.checked)}
+                className="h-4 w-4 rounded accent-[#6731dc]"
+              />
+              Set as my primary platform
+            </label>
+            <FieldError>
+              {errors[`${account.id}-url`] || errors[`${account.id}-count`]}
+            </FieldError>
+          </SectionCard>
+          {account.isPrimary && (
+            <>
+              <SectionCard
+                number="2"
+                title="Overview (Insights)"
+                description="Copy the values shown in Instagram Professional Dashboard → Insights → Overview."
+              >
+                <div className="flex justify-end">
+                  <label className="inline-flex items-center gap-2 rounded-lg border border-[#ddd8e8] bg-white px-3 py-2 text-sm font-medium">
+                    <span aria-hidden="true">◷</span>
+                    <select
+                      value={insights.period}
+                      onChange={(event) =>
+                        update({
+                          period: event.target
+                            .value as InstagramInsights["period"],
+                        })
+                      }
+                      className="bg-transparent outline-none"
+                    >
+                      <option value="7">Last 7 days</option>
+                      <option value="30">Last 30 days</option>
+                      <option value="90">Last 90 days</option>
+                    </select>
+                  </label>
+                </div>
+                <div className="mt-5 grid gap-4 sm:grid-cols-3">
+                  <NumberInput
+                    label="Views (All Content)"
+                    required
+                    value={insights.overview.views}
+                    onChange={(value) => updateOverview("views", value)}
+                  />
+                  <NumberInput
+                    label="% Followers"
+                    required
+                    percent
+                    value={insights.overview.followersPercent}
+                    onChange={(value) =>
+                      updateOverview("followersPercent", value)
+                    }
+                  />
+                  <NumberInput
+                    label="% Non-followers"
+                    required
+                    percent
+                    value={insights.overview.nonFollowersPercent}
+                    onChange={(value) =>
+                      updateOverview("nonFollowersPercent", value)
+                    }
+                  />
+                  <NumberInput
+                    label="Net Followers"
+                    required
+                    value={insights.overview.netFollowers}
+                    onChange={(value) => updateOverview("netFollowers", value)}
+                  />
+                  <NumberInput
+                    label="Interactions"
+                    required
+                    value={insights.overview.interactions}
+                    onChange={(value) => updateOverview("interactions", value)}
+                  />
+                </div>
+                <div className="mt-7">
+                  <h3 className="text-base font-semibold">
+                    Views by content type
+                  </h3>
+                  <p className="mt-1 text-sm text-[#687082]">
+                    Enter only the number of views for each content type.
+                  </p>
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    <NumberInput
+                      label="Viewers (Total)"
+                      required
+                      value={insights.overview.viewersTotal}
+                      onChange={(value) =>
+                        updateOverview("viewersTotal", value)
+                      }
+                    />
+                    {contentTypes.map((type) => (
+                      <NumberInput
+                        key={type}
+                        label={type}
+                        required
+                        value={insights.overview[viewKeys[type]]}
+                        onChange={(value) =>
+                          updateOverview(viewKeys[type], value)
+                        }
+                      />
+                    ))}
+                  </div>
+                </div>
+                <div className="mt-7">
+                  <h3 className="text-base font-semibold">
+                    Interactions by content type
+                  </h3>
+                  <p className="mt-1 text-sm text-[#687082]">
+                    Enter only the number of interactions for each content type.
+                  </p>
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    <NumberInput
+                      label="All Interactions (Total)"
+                      required
+                      value={insights.overview.allInteractions}
+                      onChange={(value) =>
+                        updateOverview("allInteractions", value)
+                      }
+                    />
+                    {contentTypes.map((type) => (
+                      <NumberInput
+                        key={type}
+                        label={type}
+                        required
+                        value={insights.overview[interactionKeys[type]]}
+                        onChange={(value) =>
+                          updateOverview(interactionKeys[type], value)
+                        }
+                      />
+                    ))}
+                  </div>
+                </div>
+                <div className="mt-7">
+                  <h3 className="text-base font-semibold">Profile activity</h3>
+                  <div className="mt-4 grid gap-4 sm:grid-cols-3">
+                    <NumberInput
+                      label="Profile Visits"
+                      required
+                      value={insights.overview.profileVisits}
+                      onChange={(value) =>
+                        updateOverview("profileVisits", value)
+                      }
+                    />
+                    <NumberInput
+                      label="Bio Link Taps"
+                      required
+                      value={insights.overview.bioLinkTaps}
+                      onChange={(value) => updateOverview("bioLinkTaps", value)}
+                    />
+                    <NumberInput
+                      label="Business Address Taps"
+                      required
+                      value={insights.overview.businessAddressTaps}
+                      onChange={(value) =>
+                        updateOverview("businessAddressTaps", value)
+                      }
+                    />
+                  </div>
+                </div>
+              </SectionCard>
+              <SectionCard
+                number="3"
+                title="Audience (Insights)"
+                description="Copy audience information from Instagram Professional Dashboard → Insights → Audience."
+              >
+                <div className="grid gap-6 lg:grid-cols-2">
+                  <div>
+                    <h3 className="text-base font-semibold">Followers</h3>
+                    <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                      <NumberInput
+                        label="Followers"
+                        required
+                        labelClassName="flex min-h-10 items-start"
+                        value={insights.audience.followers}
+                        onChange={(value) =>
+                          updateAudience({ followers: value })
+                        }
+                      />
+                      <NumberInput
+                        label={`Follower Growth (last ${insights.period} days)`}
+                        required
+                        labelClassName="flex min-h-10 items-start"
+                        value={insights.audience.followerGrowth}
+                        onChange={(value) =>
+                          updateAudience({ followerGrowth: value })
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <h3 className="text-base font-semibold">Gender</h3>
+                    <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                      <NumberInput
+                        label="Women"
+                        percent
+                        value={insights.audience.women}
+                        onChange={(value) => updateAudience({ women: value })}
+                      />
+                      <NumberInput
+                        label="Men"
+                        percent
+                        value={insights.audience.men}
+                        onChange={(value) => updateAudience({ men: value })}
+                      />
+                    </div>
+                    <PercentageTotal
+                      values={[insights.audience.women, insights.audience.men]}
+                    />
+                  </div>
+                </div>
+                <div className="mt-8 grid gap-8 lg:grid-cols-[0.85fr_1.15fr]">
+                  <div>
+                    <h3 className="text-base font-semibold">Age range</h3>
+                    <div className="mt-4 space-y-3">
+                      {ageRanges.map((range) => (
+                        <div
+                          key={range}
+                          className="grid grid-cols-[70px_minmax(0,1fr)] items-end gap-3"
+                        >
+                          <span className="pb-3 text-sm text-[#4e5667]">
+                            {range}
+                          </span>
+                          <NumberInput
+                            label=""
+                            percent
+                            value={insights.audience.ages[range]}
+                            onChange={(value) =>
+                              updateAudience({
+                                ages: {
+                                  ...insights.audience.ages,
+                                  [range]: value,
+                                },
+                              })
+                            }
+                          />
+                        </div>
+                      ))}
+                    </div>
+                    <PercentageTotal
+                      values={Object.values(insights.audience.ages)}
+                    />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-semibold">Top locations</h3>
+                    <div className="mt-4 flex border-b border-[#e8e4ec]">
+                      <button
+                        type="button"
+                        onClick={() => setLocationTab("countries")}
+                        className={`min-h-10 px-4 text-sm font-medium ${locationTab === "countries" ? "border-b-2 border-[#6731dc] text-[#6330dc]" : "text-[#6d7482]"}`}
+                      >
+                        Countries
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setLocationTab("cities")}
+                        className={`min-h-10 px-4 text-sm font-medium ${locationTab === "cities" ? "border-b-2 border-[#6731dc] text-[#6330dc]" : "text-[#6d7482]"}`}
+                      >
+                        Cities / Towns
+                      </button>
+                    </div>
+                    <div className="mt-4 space-y-3">
+                      {insights.audience.locations[locationTab].map(
+                        (location, index) => (
+                          <div
+                            key={location.id}
+                            className="grid grid-cols-[minmax(0,1fr)_110px_auto] gap-2"
+                          >
+                            <LocationAutocomplete
+                              location={location}
+                              locations={
+                                insights.audience.locations[locationTab]
+                              }
+                              tab={locationTab}
+                              onChange={(value) =>
+                                updateLocation(index, "name", value)
+                              }
+                            />
+                            <div className="relative">
+                              <input
+                                value={location.percentage}
+                                inputMode="decimal"
+                                onChange={(event) =>
+                                  updateLocation(
+                                    index,
+                                    "percentage",
+                                    event.target.value,
+                                  )
+                                }
+                                placeholder="Percent"
+                                className="min-h-10 w-full rounded-lg border border-[#dfe1e8] px-3 pr-7 text-sm outline-none focus:border-[#8760df]"
+                              />
+                              <span className="absolute right-2.5 top-2.5 text-xs text-[#747b89]">
+                                %
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => removeLocation(index)}
+                              aria-label="Remove location"
+                              className="rounded-lg p-2 text-[#7d7285] hover:bg-[#f8f5fc]"
+                            >
+                              <Icon name="trash" />
+                            </button>
+                          </div>
+                        ),
+                      )}
+                    </div>
+                    <PercentageTotal
+                      values={insights.audience.locations[locationTab].map(
+                        (location) => location.percentage,
+                      )}
+                    />
+                    <button
+                      type="button"
+                      onClick={addLocation}
+                      disabled={
+                        insights.audience.locations[locationTab].length >= 10
+                      }
+                      className="mt-4 inline-flex min-h-10 items-center gap-2 rounded-lg bg-[#f3efff] px-3.5 text-sm font-semibold text-[#6330dc] disabled:opacity-50"
+                    >
+                      <Icon name="plus" />
+                      Add location (up to 10)
+                    </button>
+                  </div>
+                </div>
+              </SectionCard>
+            </>
+          )}
+          <FieldError>{errors[`${account.id}-instagram`]}</FieldError>
+        </div>
+      )}
+    </section>
+  );
 }
 
 const InstagramEditor = InstagramAnalyticsEditor;
 
-
-function YouTubeEditor({ account, errors, onChange, onPrimaryToggle, onRemoveRequest }: { account: PlatformAccount; errors: FieldErrors; onChange: (changes: Partial<PlatformAccount>) => void; onPrimaryToggle: (checked: boolean) => void; onRemoveRequest: () => void }) {
+function YouTubeEditor({
+  account,
+  errors,
+  onChange,
+  onPrimaryToggle,
+  onRemoveRequest,
+}: {
+  account: PlatformAccount;
+  errors: FieldErrors;
+  onChange: (changes: Partial<PlatformAccount>) => void;
+  onPrimaryToggle: (checked: boolean) => void;
+  onRemoveRequest: () => void;
+}) {
   const [isExpanded, setIsExpanded] = useState(true);
   const insights = normaliseYouTubeInsights(account.youtubeInsights);
-  const updateInsights = (changes: Partial<YouTubeInsights>) => onChange({ youtubeInsights: { ...insights, ...changes } });
-  return <section className="rounded-2xl border border-[#e2dff0] bg-[#fcfbff] p-5 sm:p-6"><div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#ece9f2] pb-5"><div className="flex items-center gap-3"><PlatformMark platform="YouTube" /><div><h2 className="text-lg font-semibold">YouTube</h2><span className="mt-0.5 inline-flex rounded-full bg-[#edf9f4] px-2 py-0.5 text-[0.66rem] font-semibold text-[#19814c]">Added</span></div></div><div className="flex items-center gap-1"><button type="button" onClick={onRemoveRequest} className="rounded-lg px-2.5 py-2 text-xs font-semibold text-[#a83a46] hover:bg-[#fff1f2]">Remove</button><button type="button" onClick={() => setIsExpanded((expanded) => !expanded)} aria-expanded={isExpanded} aria-label={`${isExpanded ? 'Collapse' : 'Expand'} YouTube form`} className="grid h-9 w-9 place-items-center rounded-lg text-[#625b72] hover:bg-[#f4f0fb]"><svg viewBox="0 0 24 24" aria-hidden="true" className={`h-4 w-4 fill-none stroke-current stroke-2 transition-transform ${isExpanded ? 'rotate-180' : ''}`}><path d="m7 9 5 5 5-5" /></svg></button></div></div>{isExpanded && <div className="space-y-4 pt-5"><SectionCard number="01" title="Profile information" description="Share your YouTube channel details."><div className="grid gap-4 sm:grid-cols-3"><label><span className="text-sm font-semibold">Channel URL <span className="text-[#6a35df]">*</span></span><input value={account.profileUrl} onChange={(event) => onChange({ profileUrl: event.target.value })} placeholder="https://www.youtube.com/@yourchannel" className="mt-2 min-h-11 w-full rounded-xl border border-[#dfe1e8] px-3.5 text-sm outline-none focus:border-[#8760df]" /><FieldError>{errors[`${account.id}-url`]}</FieldError></label><label><span className="text-sm font-semibold">Username / Handle</span><input value={account.username} onChange={(event) => onChange({ username: event.target.value })} placeholder="@yourchannel" className="mt-2 min-h-11 w-full rounded-xl border border-[#dfe1e8] px-3.5 text-sm outline-none focus:border-[#8760df]" /></label><div><NumberInput label="Subscribers" required value={account.audienceCount} onChange={(value) => onChange({ audienceCount: value })} /><FieldError>{errors[`${account.id}-count`]}</FieldError></div></div><label className="mt-5 flex cursor-pointer items-start gap-3"><input type="checkbox" checked={account.isPrimary} onChange={(event) => onPrimaryToggle(event.target.checked)} className="mt-0.5 h-4 w-4 rounded accent-[#6731dc]" /><span><strong className="block text-sm font-medium">This is my primary platform</strong><small className="mt-0.5 block text-xs leading-5 text-[#697183]">Select the platform that best represents your creator presence.</small></span></label><div className="mt-5 border-t border-[#eceaf1] pt-4"><p className="text-xs text-[#707787]">Creator provided <span aria-hidden="true">·</span> Last updated: Today</p></div></SectionCard>{account.isPrimary && <><SectionCard number="02" title="YouTube Insights" description="Enter the values from your YouTube Analytics."><div className="grid gap-4 sm:grid-cols-2"><NumberInput label="Views" required value={insights.views} onChange={(value) => updateInsights({ views: value })} /><NumberInput label="Likes" required value={insights.likes} onChange={(value) => updateInsights({ likes: value })} /><NumberInput label="Shares" required value={insights.shares} onChange={(value) => updateInsights({ shares: value })} /><label className="block"><span className="text-sm font-semibold">Top Country <span className="text-[#6a35df]">*</span></span><div className="mt-2"><LocationAutocomplete location={{ id: 'youtube-top-country', name: insights.topCountry, percentage: '' }} locations={[]} tab="countries" onChange={(topCountry) => updateInsights({ topCountry })} /></div></label></div></SectionCard><p className="px-1 text-sm leading-5 text-[#687082]">Keep your channel details and current insights up to date.</p></>}</div>}</section>;
+  const updateInsights = (changes: Partial<YouTubeInsights>) =>
+    onChange({ youtubeInsights: { ...insights, ...changes } });
+  return (
+    <section className="rounded-2xl border border-[#e2dff0] bg-[#fcfbff] p-5 sm:p-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#ece9f2] pb-5">
+        <div className="flex items-center gap-3">
+          <PlatformMark platform="YouTube" />
+          <div>
+            <h2 className="text-lg font-semibold">YouTube</h2>
+            <span className="mt-0.5 inline-flex rounded-full bg-[#edf9f4] px-2 py-0.5 text-[0.66rem] font-semibold text-[#19814c]">
+              Added
+            </span>
+          </div>
+        </div>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={onRemoveRequest}
+            className="rounded-lg px-2.5 py-2 text-xs font-semibold text-[#a83a46] hover:bg-[#fff1f2]"
+          >
+            Remove
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsExpanded((expanded) => !expanded)}
+            aria-expanded={isExpanded}
+            aria-label={`${isExpanded ? "Collapse" : "Expand"} YouTube form`}
+            className="grid h-9 w-9 place-items-center rounded-lg text-[#625b72] hover:bg-[#f4f0fb]"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+              className={`h-4 w-4 fill-none stroke-current stroke-2 transition-transform ${isExpanded ? "rotate-180" : ""}`}
+            >
+              <path d="m7 9 5 5 5-5" />
+            </svg>
+          </button>
+        </div>
+      </div>
+      {isExpanded && (
+        <div className="space-y-4 pt-5">
+          <SectionCard
+            number="01"
+            title="Profile information"
+            description="Share your YouTube channel details."
+          >
+            <div className="grid gap-4 sm:grid-cols-3">
+              <label>
+                <span className="text-sm font-semibold">
+                  Channel URL <span className="text-[#6a35df]">*</span>
+                </span>
+                <input
+                  value={account.profileUrl}
+                  onChange={(event) =>
+                    onChange({ profileUrl: event.target.value })
+                  }
+                  placeholder="https://www.youtube.com/@yourchannel"
+                  className="mt-2 min-h-11 w-full rounded-xl border border-[#dfe1e8] px-3.5 text-sm outline-none focus:border-[#8760df]"
+                />
+                <FieldError>{errors[`${account.id}-url`]}</FieldError>
+              </label>
+              <label>
+                <span className="text-sm font-semibold">Username / Handle</span>
+                <input
+                  value={account.username}
+                  onChange={(event) =>
+                    onChange({ username: event.target.value })
+                  }
+                  placeholder="@yourchannel"
+                  className="mt-2 min-h-11 w-full rounded-xl border border-[#dfe1e8] px-3.5 text-sm outline-none focus:border-[#8760df]"
+                />
+              </label>
+              <div>
+                <NumberInput
+                  label="Subscribers"
+                  required
+                  value={account.audienceCount}
+                  onChange={(value) => onChange({ audienceCount: value })}
+                />
+                <FieldError>{errors[`${account.id}-count`]}</FieldError>
+              </div>
+            </div>
+            <label className="mt-5 flex cursor-pointer items-start gap-3">
+              <input
+                type="checkbox"
+                checked={account.isPrimary}
+                onChange={(event) => onPrimaryToggle(event.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded accent-[#6731dc]"
+              />
+              <span>
+                <strong className="block text-sm font-medium">
+                  This is my primary platform
+                </strong>
+                <small className="mt-0.5 block text-xs leading-5 text-[#697183]">
+                  Select the platform that best represents your creator
+                  presence.
+                </small>
+              </span>
+            </label>
+            <div className="mt-5 border-t border-[#eceaf1] pt-4">
+              <p className="text-xs text-[#707787]">
+                Creator provided <span aria-hidden="true">·</span> Last updated:
+                Today
+              </p>
+            </div>
+          </SectionCard>
+          {account.isPrimary && (
+            <>
+              <SectionCard
+                number="02"
+                title="YouTube Insights"
+                description="Enter the values from your YouTube Analytics."
+              >
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <NumberInput
+                    label="Views"
+                    required
+                    value={insights.views}
+                    onChange={(value) => updateInsights({ views: value })}
+                  />
+                  <NumberInput
+                    label="Likes"
+                    required
+                    value={insights.likes}
+                    onChange={(value) => updateInsights({ likes: value })}
+                  />
+                  <NumberInput
+                    label="Shares"
+                    required
+                    value={insights.shares}
+                    onChange={(value) => updateInsights({ shares: value })}
+                  />
+                  <label className="block">
+                    <span className="text-sm font-semibold">
+                      Top Country <span className="text-[#6a35df]">*</span>
+                    </span>
+                    <div className="mt-2">
+                      <LocationAutocomplete
+                        location={{
+                          id: "youtube-top-country",
+                          name: insights.topCountry,
+                          percentage: "",
+                        }}
+                        locations={[]}
+                        tab="countries"
+                        onChange={(topCountry) =>
+                          updateInsights({ topCountry })
+                        }
+                      />
+                    </div>
+                  </label>
+                </div>
+              </SectionCard>
+              <p className="px-1 text-sm leading-5 text-[#687082]">
+                Keep your channel details and current insights up to date.
+              </p>
+            </>
+          )}
+        </div>
+      )}
+    </section>
+  );
 }
 
-function InstagramHelp() { return <aside className="order-3 rounded-2xl border border-[#e4dff0] bg-white p-6 shadow-[0_7px_20px_rgba(50,40,80,0.03)] xl:sticky xl:top-5"><span className="grid h-10 w-10 place-items-center rounded-full bg-[#f0eaff] text-[#6530dc]"><Icon name="book" /></span><h2 className="mt-4 text-base font-semibold">Where to find this data?</h2><p className="mt-3 text-sm leading-6 text-[#5d5875]">Open Instagram → Professional Dashboard → Insights.</p><ol className="mt-5 space-y-4 text-sm leading-5 text-[#5d5875]"><li><strong className="text-[#2d2935]">Overview</strong><br />Insights → Overview → select the same time period (default 30 days) → copy the displayed numbers.</li><li><strong className="text-[#2d2935]">Audience</strong><br />Insights → Audience → select the same time period → copy the displayed numbers.</li></ol><p className="mt-5 border-t border-[#ece7f2] pt-4 text-xs leading-5 text-[#5d5875]">All information is creator provided. CloutCo does not calculate or fabricate Instagram Insights values.</p></aside>; }
-function FacebookHelp() { return <aside className="order-3 rounded-2xl border border-[#e4dff0] bg-white p-6 shadow-[0_7px_20px_rgba(50,40,80,0.03)] xl:sticky xl:top-5"><span className="grid h-10 w-10 place-items-center rounded-full bg-[#f0eaff] text-[#6530dc]"><Icon name="book" /></span><h2 className="mt-4 text-base font-semibold">Where to find this data?</h2><p className="mt-3 text-sm leading-6 text-[#5d5875]">Open Facebook → Professional Dashboard → Analytics.</p><ol className="mt-5 space-y-4 text-sm leading-5 text-[#5d5875]"><li><strong className="text-[#2d2935]">Overview</strong><br />Analytics → select the same time period → copy the displayed numbers.</li><li><strong className="text-[#2d2935]">Audience</strong><br />Analytics → Audience → copy the displayed numbers.</li></ol><p className="mt-5 border-t border-[#ece7f2] pt-4 text-xs leading-5 text-[#5d5875]">All information is creator provided. CloutCo does not calculate or fabricate Facebook Analytics values.</p></aside>; }
+function InstagramHelp() {
+  return (
+    <aside className="order-3 rounded-2xl border border-[#e4dff0] bg-white p-6 shadow-[0_7px_20px_rgba(50,40,80,0.03)] xl:sticky xl:top-5">
+      <span className="grid h-10 w-10 place-items-center rounded-full bg-[#f0eaff] text-[#6530dc]">
+        <Icon name="book" />
+      </span>
+      <h2 className="mt-4 text-base font-semibold">Where to find this data?</h2>
+      <p className="mt-3 text-sm leading-6 text-[#5d5875]">
+        Open Instagram → Professional Dashboard → Insights.
+      </p>
+      <ol className="mt-5 space-y-4 text-sm leading-5 text-[#5d5875]">
+        <li>
+          <strong className="text-[#2d2935]">Overview</strong>
+          <br />
+          Insights → Overview → select the same time period (default 30 days) →
+          copy the displayed numbers.
+        </li>
+        <li>
+          <strong className="text-[#2d2935]">Audience</strong>
+          <br />
+          Insights → Audience → select the same time period → copy the displayed
+          numbers.
+        </li>
+      </ol>
+      <p className="mt-5 border-t border-[#ece7f2] pt-4 text-xs leading-5 text-[#5d5875]">
+        All information is creator provided. CloutCo does not calculate or
+        fabricate Instagram Insights values.
+      </p>
+    </aside>
+  );
+}
+function FacebookHelp() {
+  return (
+    <aside className="order-3 rounded-2xl border border-[#e4dff0] bg-white p-6 shadow-[0_7px_20px_rgba(50,40,80,0.03)] xl:sticky xl:top-5">
+      <span className="grid h-10 w-10 place-items-center rounded-full bg-[#f0eaff] text-[#6530dc]">
+        <Icon name="book" />
+      </span>
+      <h2 className="mt-4 text-base font-semibold">Where to find this data?</h2>
+      <p className="mt-3 text-sm leading-6 text-[#5d5875]">
+        Open Facebook → Professional Dashboard → Analytics.
+      </p>
+      <ol className="mt-5 space-y-4 text-sm leading-5 text-[#5d5875]">
+        <li>
+          <strong className="text-[#2d2935]">Overview</strong>
+          <br />
+          Analytics → select the same time period → copy the displayed numbers.
+        </li>
+        <li>
+          <strong className="text-[#2d2935]">Audience</strong>
+          <br />
+          Analytics → Audience → copy the displayed numbers.
+        </li>
+      </ol>
+      <p className="mt-5 border-t border-[#ece7f2] pt-4 text-xs leading-5 text-[#5d5875]">
+        All information is creator provided. CloutCo does not calculate or
+        fabricate Facebook Analytics values.
+      </p>
+    </aside>
+  );
+}
 
 export default function SocialPlatformsPage() {
   const router = useRouter();
   const [accounts, setAccounts] = useState<PlatformAccount[]>(defaults);
-  const [creatorId, setCreatorId] = useState('');
+  const [creatorId, setCreatorId] = useState("");
   const [loading, setLoading] = useState(true);
   const [pendingRemoval, setPendingRemoval] = useState<string | null>(null);
   const [errors, setErrors] = useState<FieldErrors>({});
-  const [notice, setNotice] = useState('');
+  const [notice, setNotice] = useState("");
   const [showPrimaryPrompt, setShowPrimaryPrompt] = useState(false);
   const [saving, setSaving] = useState(false);
-  useEffect(() => { const supabase = getSupabaseClient(); if (!supabase) { router.replace('/signin'); return; } void supabase.auth.getUser().then(async ({ data }) => { if (!data.user) { router.replace('/signin'); return; } const { data: creator } = await supabase.from('creators').select('id').eq('auth_user_id', data.user.id).maybeSingle(); if (!creator) { router.replace('/profile'); return; } setCreatorId(creator.id); try { const stored = await loadSocialAccounts(creator.id) as PlatformAccount[]; if (stored.length) setAccounts(stored.map((account) => account.platform === 'Instagram' ? { ...account, instagramInsights: normaliseInsights(account.instagramInsights) } : account.platform === 'Facebook' ? { ...account, facebookInsights: normaliseFacebookInsights(account.facebookInsights) } : account.platform === 'YouTube' ? { ...account, youtubeInsights: normaliseYouTubeInsights(account.youtubeInsights) } : account)); } catch { setNotice('Your saved social platforms could not be loaded.'); } setLoading(false); }); }, [router]);
-  const addedPlatforms = useMemo(() => new Set(accounts.map((account) => account.platform)), [accounts]);
-  const availablePlatforms = platforms.filter((platform) => !addedPlatforms.has(platform));
-  const persist = (next = accounts) => window.sessionStorage.setItem(storageKey, JSON.stringify(next));
-  const updateAccount = (id: string, changes: Partial<PlatformAccount>) => { const definedChanges = Object.fromEntries(Object.entries(changes).filter(([, value]) => value !== undefined)) as Partial<PlatformAccount>; setAccounts((current) => current.map((account) => account.id === id ? { ...account, ...definedChanges } : account)); setErrors((current) => ({ ...current, [`${id}-url`]: '', [`${id}-count`]: '', [`${id}-instagram`]: '', [`${id}-facebook`]: '', [`${id}-youtube`]: '' })); };
-  const setPrimary = (id: string, checked = true) => setAccounts((current) => current.map((account) => checked ? { ...account, isPrimary: account.id === id } : account.id === id ? { ...account, isPrimary: false } : account));
-  const addPlatform = (platform: Platform) => { if (!platforms.includes(platform)) return; const id = `${platform.toLowerCase()}-${Date.now()}`; setAccounts((current) => [...current, { id, platform, platformName: platform, profileUrl: '', username: '', audienceCount: '', isPrimary: current.length === 0, ...(platform === 'Instagram' ? { instagramInsights: emptyInsights() } : platform === 'Facebook' ? { facebookInsights: emptyFacebookInsights() } : { youtubeInsights: emptyYouTubeInsights() }) }]); };
-  const removePlatform = (id: string) => { setAccounts((current) => current.filter((account) => account.id !== id)); setPendingRemoval(null); };
-  const isValidUrl = (value: string) => { try { const url = new URL(value); return url.protocol === 'https:' || url.protocol === 'http:'; } catch { return false; } };
-  const validateInstagram = (account: PlatformAccount, next: FieldErrors) => { const insights = normaliseInsights(account.instagramInsights); const requiredNumbers = ['views', 'netFollowers', 'interactions', 'viewersTotal', 'profileVisits']; const ages = insights.audience.topAgeRanges.map((value) => value.trim()); const cities = insights.audience.topCities.map((value) => value.trim()); const validSelections = ages.length >= 1 && ages.length <= 2 && new Set(ages.map((value) => value.toLowerCase())).size === ages.length && ages.every(Boolean) && cities.length >= 1 && cities.length <= 5 && new Set(cities.map((value) => value.toLowerCase())).size === cities.length && cities.every(Boolean); if (!requiredNumbers.every((key) => isWholeNumber(insights.overview[key])) || !isPercentageValue(insights.audience.women) || !isPercentageValue(insights.audience.men) || !validSelections) next[`${account.id}-instagram`] = 'Complete all required Instagram Insights fields with valid values.'; };
-  const validateFacebook = (account: PlatformAccount, next: FieldErrors) => { const insights = normaliseFacebookInsights(account.facebookInsights); const cities = (insights.audience.topCities || []).map((value) => value.trim()); const hasValidCities = cities.length >= 1 && cities.length <= 5 && cities.every(Boolean) && new Set(cities.map((value) => value.toLocaleLowerCase('en-IN'))).size === cities.length; const hasValidAgeGroup = ['18–24', '25–34', '35–44', 'Other'].includes(insights.audience.topAgeGroup || ''); const hasValidMetrics = [insights.overview.viewsTotal, insights.overview.viewers, insights.engagement.total, insights.audience.netFollowers].every(isWholeNumber) && isPercentageValue(insights.audience.women) && isPercentageValue(insights.audience.men); if (!hasValidMetrics || !hasValidAgeGroup || !hasValidCities) next[`${account.id}-facebook`] = 'Complete all required Facebook Insights fields with valid values.'; };
-  const validateYouTube = (account: PlatformAccount, next: FieldErrors) => { const insights = normaliseYouTubeInsights(account.youtubeInsights); if (![insights.views, insights.likes, insights.shares].every(isWholeNumber) || !insights.topCountry.trim()) next[`${account.id}-youtube`] = 'Complete required YouTube Insights fields with non-negative whole numbers and a top country.'; };
-  const validate = () => { const next: FieldErrors = {}; if (!accounts.length) next.form = 'Add at least one platform to continue.'; accounts.forEach((account) => { if (!isValidUrl(account.profileUrl)) next[`${account.id}-url`] = 'Enter a valid profile or channel URL.'; if (!account.audienceCount || !Number.isFinite(Number(account.audienceCount))) next[`${account.id}-count`] = `Enter a valid ${account.platform === 'YouTube' ? 'subscriber' : 'follower'} count.`; if (account.isPrimary && account.platform === 'Instagram') validateInstagram(account, next); if (account.isPrimary && account.platform === 'Facebook') validateFacebook(account, next); if (account.isPrimary && account.platform === 'YouTube') validateYouTube(account, next); }); setErrors(next); return Object.keys(next).length === 0; };
-  const canSave = () => { setNotice(''); if (accounts.length && !accounts.some((account) => account.isPrimary)) { setShowPrimaryPrompt(true); return false; } if (!validate()) { setNotice('Please review the highlighted platform details.'); return false; } return true; };
-  const saveToDatabase = async () => { if (saving || !canSave() || !creatorId) return false; setSaving(true); try { await saveSocialAccounts(creatorId, accounts); persist(); return true; } catch (error) { setNotice(error instanceof Error ? error.message : 'We could not save your social platforms.'); setSaving(false); return false; } };
-  const saveAndExit = () => { void saveToDatabase().then((saved) => { if (saved) router.push('/profile'); }); };
-  const saveAndContinue = () => { void saveToDatabase().then((saved) => { if (saved) { window.sessionStorage.setItem('cloutco-social-platforms-complete', 'true'); router.push(getNextProfileRoute({ 'Basic Information': true, 'Creator Identity': true, 'Content & Niche': true, 'Social Platforms': true })); } }); };
-  if (loading) return <main className="grid min-h-screen place-items-center bg-[#fbfaff] text-sm text-[#5b6272]">Loading your social platforms...</main>;
-  const hasFacebook = accounts.some((account) => account.platform === 'Facebook');
-  return <main className="min-h-screen bg-[#fbfaff] text-[#17171b]"><header className="flex h-[76px] items-center justify-between border-b border-[#e8e7eb] bg-white px-5 sm:px-8 lg:px-10"><AuthAwareLogo className="text-[1.45rem] font-semibold tracking-[-0.08em] text-black sm:text-[1.7rem]" /><div className="flex items-center gap-4 sm:gap-6"><button type="button" aria-label="Notifications" className="text-[#4e5667]"><Icon name="bell" /></button><span className="hidden h-8 w-px bg-[#e7e7eb] sm:block" /><AuthenticatedCreatorHeaderIdentity variant="compact" /></div></header><div className="mx-auto flex max-w-[1600px]"><aside className="hidden w-[205px] shrink-0 border-r border-[#e8e7eb] bg-white px-5 py-7 lg:block"><nav className="space-y-1.5" aria-label="Creator navigation"><Link href="/dashboard" className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-[#343946] hover:bg-[#faf8ff]"><Icon name="home" />Dashboard</Link><Link href="/profile" className="flex items-center gap-3 rounded-xl bg-[#f1ebff] px-3 py-3 text-sm font-medium text-[#6330dc]"><Icon name="user" />My Profile</Link><a href="#messages" className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-[#343946] hover:bg-[#faf8ff]"><Icon name="message" />Messages</a><a href="#settings" className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-[#343946] hover:bg-[#faf8ff]"><Icon name="settings" />Settings</a></nav></aside><div className="min-w-0 flex-1 px-5 py-8 sm:px-8 lg:px-12"><div><div className="mb-8"><p className="text-xs font-bold tracking-[0.14em] text-[#6a35df]">SOCIAL PLATFORMS</p><h1 className="mt-2 text-[2.25rem] font-semibold tracking-[-0.06em] sm:text-[2.75rem]">Instagram</h1><p className="mt-3 max-w-3xl text-base leading-7 text-[#5e6678]">Add your professional social insights to build a stronger profile and unlock better collaboration opportunities.</p></div><div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_280px] xl:items-start"><section className="rounded-2xl border border-[#e8e7eb] bg-white p-5 shadow-[0_7px_20px_rgba(50,40,80,0.03)] sm:p-8"><form onSubmit={(event) => { event.preventDefault(); saveAndContinue(); }} className="space-y-4">{accounts.map((account) => account.platform === 'Instagram' ? <InstagramEditor key={account.id} account={account} errors={errors} onChange={(changes) => updateAccount(account.id, changes)} onPrimaryToggle={(checked) => setPrimary(account.id, checked)} onRemoveRequest={() => setPendingRemoval(account.id)} /> : account.platform === 'Facebook' ? <FacebookAnalyticsEditor key={account.id} account={account} errors={errors} onChange={(changes) => { const currentInsights = normaliseFacebookInsights(account.facebookInsights); const nextInsights = changes.facebookInsights; updateAccount(account.id, { profileUrl: changes.profileUrl, username: changes.username, audienceCount: changes.audienceCount, facebookInsights: nextInsights ? { ...currentInsights, ...nextInsights, overview: { ...currentInsights.overview, ...nextInsights.overview }, engagement: { ...currentInsights.engagement, ...nextInsights.engagement }, audience: { ...currentInsights.audience, ...nextInsights.audience } } : undefined }); }} onPrimaryToggle={(checked) => setPrimary(account.id, checked)} onRemoveRequest={() => setPendingRemoval(account.id)} /> : <YouTubeEditor key={account.id} account={account} errors={errors} onChange={(changes) => updateAccount(account.id, changes)} onPrimaryToggle={(checked) => setPrimary(account.id, checked)} onRemoveRequest={() => setPendingRemoval(account.id)} />)}{availablePlatforms.length ? <div className="grid gap-3 sm:grid-cols-3">{availablePlatforms.map((platform) => <div key={platform} className="flex min-h-[76px] items-center justify-between gap-3 rounded-xl border border-[#e6e5ea] bg-white p-4"><div className="flex min-w-0 items-center gap-3"><PlatformMark platform={platform} /><span className="truncate text-sm font-semibold">{platform}</span></div><button type="button" onClick={() => addPlatform(platform)} className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-lg border border-[#dcd9e4] px-3 text-xs font-semibold text-[#5f2ed0] hover:border-[#bda5f4]"><Icon name="plus" />Add</button></div>)}</div> : null}{errors.form && <FieldError>{errors.form}</FieldError>}{notice && <p role="alert" className="rounded-xl border border-[#f1d1d1] bg-[#fff7f7] px-3.5 py-3 text-sm text-[#a12c2c]">{notice}</p>}<div className="mt-8 flex flex-col-reverse gap-3 border-t border-[#efeff2] pt-6 sm:flex-row sm:justify-end"><button type="button" onClick={saveAndExit} disabled={saving} className="min-h-12 rounded-xl border border-[#d9dce3] px-6 text-sm font-medium text-[#30333b] disabled:cursor-not-allowed disabled:opacity-60">Save &amp; Exit</button><button type="submit" disabled={saving} className="min-h-12 rounded-xl bg-[#6731dc] px-7 text-sm font-medium text-white shadow-[0_8px_18px_rgba(99,48,220,0.18)] disabled:cursor-not-allowed disabled:opacity-60">{saving ? 'Saving...' : <>Save &amp; Continue <span className="ml-1">→</span></>}</button></div></form></section>{hasFacebook ? <FacebookHelp /> : <InstagramHelp />}</div></div></div></div>{pendingRemoval && (() => { const account = accounts.find((item) => item.id === pendingRemoval); if (!account) return null; return <div role="dialog" aria-modal="true" aria-labelledby="remove-platform-title" className="fixed inset-0 z-50 grid place-items-center bg-[#19152d]/20 p-5"><div className="w-full max-w-sm rounded-2xl border border-[#e4dff0] bg-white p-6 shadow-[0_20px_60px_rgba(41,28,75,0.18)]"><h2 id="remove-platform-title" className="text-lg font-semibold">Remove {account.platform}?</h2><p className="mt-2 text-sm leading-6 text-[#667084]">This will remove the platform from this profile.</p><div className="mt-6 flex justify-end gap-3"><button type="button" onClick={() => setPendingRemoval(null)} className="min-h-10 rounded-lg border border-[#d9dce3] px-4 text-sm font-medium">Cancel</button><button type="button" onClick={() => removePlatform(account.id)} className="min-h-10 rounded-lg bg-[#b62e40] px-4 text-sm font-medium text-white">Remove</button></div></div></div>; })()}{showPrimaryPrompt && <div role="dialog" aria-modal="true" aria-labelledby="primary-platform-title" className="fixed inset-0 z-50 grid place-items-center bg-[#19152d]/20 p-5"><div className="w-full max-w-sm rounded-2xl border border-[#e4dff0] bg-white p-6 shadow-[0_20px_60px_rgba(41,28,75,0.18)]"><h2 id="primary-platform-title" className="text-lg font-semibold">Select a primary platform</h2><p className="mt-2 text-sm leading-6 text-[#667084]">Please select at least one primary platform before continuing.</p><div className="mt-6 flex justify-end"><button type="button" onClick={() => setShowPrimaryPrompt(false)} className="min-h-10 rounded-lg bg-[#6731dc] px-4 text-sm font-medium text-white">Okay</button></div></div></div>}</main>;
+  useEffect(() => {
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      router.replace("/signin");
+      return;
+    }
+    void supabase.auth.getUser().then(async ({ data }) => {
+      if (!data.user) {
+        router.replace("/signin");
+        return;
+      }
+      const { data: creator } = await supabase
+        .from("creators")
+        .select("id")
+        .eq("auth_user_id", data.user.id)
+        .maybeSingle();
+      if (!creator) {
+        router.replace("/profile");
+        return;
+      }
+      setCreatorId(creator.id);
+      try {
+        const stored = (await loadSocialAccounts(
+          creator.id,
+        )) as PlatformAccount[];
+        if (stored.length)
+          setAccounts(
+            stored.map((account) =>
+              account.platform === "Instagram"
+                ? {
+                    ...account,
+                    instagramInsights: normaliseInsights(
+                      account.instagramInsights,
+                    ),
+                  }
+                : account.platform === "Facebook"
+                  ? {
+                      ...account,
+                      facebookInsights: normaliseFacebookInsights(
+                        account.facebookInsights,
+                      ),
+                    }
+                  : account.platform === "YouTube"
+                    ? {
+                        ...account,
+                        youtubeInsights: normaliseYouTubeInsights(
+                          account.youtubeInsights,
+                        ),
+                      }
+                    : account,
+            ),
+          );
+      } catch {
+        setNotice("Your saved social platforms could not be loaded.");
+      }
+      setLoading(false);
+    });
+  }, [router]);
+  const addedPlatforms = useMemo(
+    () => new Set(accounts.map((account) => account.platform)),
+    [accounts],
+  );
+  const availablePlatforms = platforms.filter(
+    (platform) => !addedPlatforms.has(platform),
+  );
+  const persist = (next = accounts) =>
+    window.sessionStorage.setItem(storageKey, JSON.stringify(next));
+  const updateAccount = (id: string, changes: Partial<PlatformAccount>) => {
+    const definedChanges = Object.fromEntries(
+      Object.entries(changes).filter(([, value]) => value !== undefined),
+    ) as Partial<PlatformAccount>;
+    setAccounts((current) =>
+      current.map((account) =>
+        account.id === id ? { ...account, ...definedChanges } : account,
+      ),
+    );
+    setErrors((current) => ({
+      ...current,
+      [`${id}-url`]: "",
+      [`${id}-count`]: "",
+      [`${id}-instagram`]: "",
+      [`${id}-facebook`]: "",
+      [`${id}-youtube`]: "",
+    }));
+  };
+  const setPrimary = (id: string, checked = true) =>
+    setAccounts((current) =>
+      current.map((account) =>
+        checked
+          ? { ...account, isPrimary: account.id === id }
+          : account.id === id
+            ? { ...account, isPrimary: false }
+            : account,
+      ),
+    );
+  const addPlatform = (platform: Platform) => {
+    if (!platforms.includes(platform)) return;
+    const id = `${platform.toLowerCase()}-${Date.now()}`;
+    setAccounts((current) => [
+      ...current,
+      {
+        id,
+        platform,
+        platformName: platform,
+        profileUrl: "",
+        username: "",
+        audienceCount: "",
+        isPrimary: current.length === 0,
+        ...(platform === "Instagram"
+          ? { instagramInsights: emptyInsights() }
+          : platform === "Facebook"
+            ? { facebookInsights: emptyFacebookInsights() }
+            : { youtubeInsights: emptyYouTubeInsights() }),
+      },
+    ]);
+  };
+  const removePlatform = (id: string) => {
+    setAccounts((current) => current.filter((account) => account.id !== id));
+    setPendingRemoval(null);
+  };
+  const isValidUrl = (value: string) => {
+    try {
+      const url = new URL(value);
+      return url.protocol === "https:" || url.protocol === "http:";
+    } catch {
+      return false;
+    }
+  };
+  const validateInstagram = (account: PlatformAccount, next: FieldErrors) => {
+    const insights = normaliseInsights(account.instagramInsights);
+    const requiredNumbers = [
+      "views",
+      "netFollowers",
+      "interactions",
+      "viewersTotal",
+      "profileVisits",
+    ];
+    const requiredFieldLabels: Record<string, string> = {
+      views: "Views",
+      netFollowers: "Net Followers",
+      interactions: "Interactions",
+      viewersTotal: "Viewers (Total)",
+      profileVisits: "Profile Visits",
+    };
+    const ages = insights.audience.topAgeRanges.map((value) => value.trim());
+    const cities = insights.audience.topCities.map((value) => value.trim());
+    const validSelections =
+      ages.length >= 1 &&
+      ages.length <= 2 &&
+      new Set(ages.map((value) => value.toLowerCase())).size === ages.length &&
+      ages.every(Boolean) &&
+      cities.length >= 1 &&
+      cities.length <= 5 &&
+      new Set(cities.map((value) => value.toLowerCase())).size ===
+        cities.length &&
+      cities.every(Boolean);
+    const invalidFields = [
+      ...requiredNumbers
+        .filter((key) => !isWholeNumber(insights.overview[key]))
+        .map((key) => requiredFieldLabels[key]),
+      ...(!isPercentageValue(insights.audience.women) ? ["Women %"] : []),
+      ...(!isPercentageValue(insights.audience.men) ? ["Men %"] : []),
+      ...(!validSelections ? ["Top age ranges and cities/towns"] : []),
+    ];
+    if (invalidFields.length)
+      next[`${account.id}-instagram`] =
+        `Instagram requires: ${invalidFields.join(", ")}.`;
+  };
+  const validateFacebook = (account: PlatformAccount, next: FieldErrors) => {
+    const insights = normaliseFacebookInsights(account.facebookInsights);
+    const cities = (insights.audience.topCities || []).map((value) =>
+      value.trim(),
+    );
+    const hasValidCities =
+      cities.length >= 1 &&
+      cities.length <= 5 &&
+      cities.every(Boolean) &&
+      new Set(cities.map((value) => value.toLocaleLowerCase("en-IN"))).size ===
+        cities.length;
+    const hasValidAgeGroup = ["18–24", "25–34", "35–44", "Other"].includes(
+      insights.audience.topAgeGroup || "",
+    );
+    const hasValidMetrics =
+      [
+        insights.overview.viewsTotal,
+        insights.overview.viewers,
+        insights.engagement.total,
+        insights.audience.netFollowers,
+      ].every(isWholeNumber) &&
+      isPercentageValue(insights.audience.women) &&
+      isPercentageValue(insights.audience.men);
+    const invalidFields = [
+      ...(!isWholeNumber(insights.overview.viewsTotal) ? ["Views"] : []),
+      ...(!isWholeNumber(insights.overview.viewers) ? ["Viewers"] : []),
+      ...(!isWholeNumber(insights.engagement.total) ? ["Engagement"] : []),
+      ...(!isWholeNumber(insights.audience.netFollowers)
+        ? ["Net Followers"]
+        : []),
+      ...(!isPercentageValue(insights.audience.women) ? ["Women %"] : []),
+      ...(!isPercentageValue(insights.audience.men) ? ["Men %"] : []),
+      ...(!hasValidAgeGroup ? ["one Age Group"] : []),
+      ...(!hasValidCities ? ["1–5 unique cities/towns"] : []),
+    ];
+    if (!hasValidMetrics || invalidFields.length)
+      next[`${account.id}-facebook`] =
+        `Facebook requires: ${invalidFields.join(", ")}.`;
+  };
+  const validateYouTube = (account: PlatformAccount, next: FieldErrors) => {
+    const insights = normaliseYouTubeInsights(account.youtubeInsights);
+    const invalidFields = [
+      ...(!isWholeNumber(insights.views) ? ["Views"] : []),
+      ...(!isWholeNumber(insights.likes) ? ["Likes"] : []),
+      ...(!isWholeNumber(insights.shares) ? ["Shares"] : []),
+      ...(!insights.topCountry.trim() ? ["Top Country"] : []),
+    ];
+    if (invalidFields.length)
+      next[`${account.id}-youtube`] =
+        `YouTube requires: ${invalidFields.join(", ")}.`;
+  };
+  const validate = () => {
+    const next: FieldErrors = {};
+    if (!accounts.length) next.form = "Add at least one platform to continue.";
+    accounts.forEach((account) => {
+      if (!isValidUrl(account.profileUrl))
+        next[`${account.id}-url`] = "Enter a valid profile or channel URL.";
+      if (
+        !account.audienceCount ||
+        !Number.isFinite(Number(account.audienceCount))
+      )
+        next[`${account.id}-count`] =
+          `Enter a valid ${account.platform === "YouTube" ? "subscriber" : "follower"} count.`;
+      if (account.isPrimary && account.platform === "Instagram")
+        validateInstagram(account, next);
+      if (account.isPrimary && account.platform === "Facebook")
+        validateFacebook(account, next);
+      if (account.isPrimary && account.platform === "YouTube")
+        validateYouTube(account, next);
+    });
+    setErrors(next);
+    return Object.keys(next).length === 0;
+  };
+  const canSave = () => {
+    setNotice("");
+    if (accounts.length && !accounts.some((account) => account.isPrimary)) {
+      setShowPrimaryPrompt(true);
+      return false;
+    }
+    if (!validate()) {
+      setNotice("Fix the fields listed below before saving.");
+      return false;
+    }
+    return true;
+  };
+  const saveToDatabase = async () => {
+    if (saving || !canSave() || !creatorId) return false;
+    setSaving(true);
+    try {
+      await saveSocialAccounts(creatorId, accounts);
+      persist();
+      return true;
+    } catch (error) {
+      setNotice(
+        error instanceof Error
+          ? error.message
+          : "We could not save your social platforms.",
+      );
+      setSaving(false);
+      return false;
+    }
+  };
+  const saveAndExit = () => {
+    void saveToDatabase().then((saved) => {
+      if (saved) router.push("/profile");
+    });
+  };
+  const saveAndContinue = () => {
+    void saveToDatabase().then((saved) => {
+      if (saved) {
+        window.sessionStorage.setItem(
+          "cloutco-social-platforms-complete",
+          "true",
+        );
+        router.push(
+          getNextProfileRoute({
+            "Basic Information": true,
+            "Creator Identity": true,
+            "Content & Niche": true,
+            "Social Platforms": true,
+          }),
+        );
+      }
+    });
+  };
+  if (loading)
+    return (
+      <main className="grid min-h-screen place-items-center bg-[#fbfaff] text-sm text-[#5b6272]">
+        Loading your social platforms...
+      </main>
+    );
+  const hasFacebook = accounts.some(
+    (account) => account.platform === "Facebook",
+  );
+  const validationMessages = Object.entries(errors)
+    .filter(([key]) => key !== "form")
+    .map(([, message]) => message);
+  return (
+    <main className="min-h-screen bg-[#fbfaff] text-[#17171b]">
+      <header className="flex h-[76px] items-center justify-between border-b border-[#e8e7eb] bg-white px-5 sm:px-8 lg:px-10">
+        <AuthAwareLogo className="text-[1.45rem] font-semibold tracking-[-0.08em] text-black sm:text-[1.7rem]" />
+        <div className="flex items-center gap-4 sm:gap-6">
+          <button
+            type="button"
+            aria-label="Notifications"
+            className="text-[#4e5667]"
+          >
+            <Icon name="bell" />
+          </button>
+          <span className="hidden h-8 w-px bg-[#e7e7eb] sm:block" />
+          <AuthenticatedCreatorHeaderIdentity variant="compact" />
+        </div>
+      </header>
+      <div className="mx-auto flex max-w-[1600px]">
+        <aside className="hidden w-[205px] shrink-0 border-r border-[#e8e7eb] bg-white px-5 py-7 lg:block">
+          <nav className="space-y-1.5" aria-label="Creator navigation">
+            <Link
+              href="/dashboard"
+              className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-[#343946] hover:bg-[#faf8ff]"
+            >
+              <Icon name="home" />
+              Dashboard
+            </Link>
+            <Link
+              href="/profile"
+              className="flex items-center gap-3 rounded-xl bg-[#f1ebff] px-3 py-3 text-sm font-medium text-[#6330dc]"
+            >
+              <Icon name="user" />
+              My Profile
+            </Link>
+            <a
+              href="#messages"
+              className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-[#343946] hover:bg-[#faf8ff]"
+            >
+              <Icon name="message" />
+              Messages
+            </a>
+            <a
+              href="#settings"
+              className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-[#343946] hover:bg-[#faf8ff]"
+            >
+              <Icon name="settings" />
+              Settings
+            </a>
+          </nav>
+        </aside>
+        <div className="min-w-0 flex-1 px-5 py-8 sm:px-8 lg:px-12">
+          <div>
+            <div className="mb-8">
+              <p className="text-xs font-bold tracking-[0.14em] text-[#6a35df]">
+                SOCIAL PLATFORMS
+              </p>
+              <h1 className="mt-2 text-[2.25rem] font-semibold tracking-[-0.06em] sm:text-[2.75rem]">
+                Instagram
+              </h1>
+              <p className="mt-3 max-w-3xl text-base leading-7 text-[#5e6678]">
+                Add your professional social insights to build a stronger
+                profile and unlock better collaboration opportunities.
+              </p>
+            </div>
+            <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_280px] xl:items-start">
+              <section className="rounded-2xl border border-[#e8e7eb] bg-white p-5 shadow-[0_7px_20px_rgba(50,40,80,0.03)] sm:p-8">
+                <form
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    saveAndContinue();
+                  }}
+                  className="space-y-4"
+                >
+                  {accounts.map((account) =>
+                    account.platform === "Instagram" ? (
+                      <InstagramEditor
+                        key={account.id}
+                        account={account}
+                        errors={errors}
+                        onChange={(changes) =>
+                          updateAccount(account.id, changes)
+                        }
+                        onPrimaryToggle={(checked) =>
+                          setPrimary(account.id, checked)
+                        }
+                        onRemoveRequest={() => setPendingRemoval(account.id)}
+                      />
+                    ) : account.platform === "Facebook" ? (
+                      <FacebookAnalyticsEditor
+                        key={account.id}
+                        account={account}
+                        errors={errors}
+                        onChange={(changes) => {
+                          const currentInsights = normaliseFacebookInsights(
+                            account.facebookInsights,
+                          );
+                          const nextInsights = changes.facebookInsights;
+                          updateAccount(account.id, {
+                            profileUrl: changes.profileUrl,
+                            username: changes.username,
+                            audienceCount: changes.audienceCount,
+                            facebookInsights: nextInsights
+                              ? {
+                                  ...currentInsights,
+                                  ...nextInsights,
+                                  overview: {
+                                    ...currentInsights.overview,
+                                    ...nextInsights.overview,
+                                  },
+                                  engagement: {
+                                    ...currentInsights.engagement,
+                                    ...nextInsights.engagement,
+                                  },
+                                  audience: {
+                                    ...currentInsights.audience,
+                                    ...nextInsights.audience,
+                                  },
+                                }
+                              : undefined,
+                          });
+                        }}
+                        onPrimaryToggle={(checked) =>
+                          setPrimary(account.id, checked)
+                        }
+                        onRemoveRequest={() => setPendingRemoval(account.id)}
+                      />
+                    ) : (
+                      <YouTubeEditor
+                        key={account.id}
+                        account={account}
+                        errors={errors}
+                        onChange={(changes) =>
+                          updateAccount(account.id, changes)
+                        }
+                        onPrimaryToggle={(checked) =>
+                          setPrimary(account.id, checked)
+                        }
+                        onRemoveRequest={() => setPendingRemoval(account.id)}
+                      />
+                    ),
+                  )}
+                  {availablePlatforms.length ? (
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      {availablePlatforms.map((platform) => (
+                        <div
+                          key={platform}
+                          className="flex min-h-[76px] items-center justify-between gap-3 rounded-xl border border-[#e6e5ea] bg-white p-4"
+                        >
+                          <div className="flex min-w-0 items-center gap-3">
+                            <PlatformMark platform={platform} />
+                            <span className="truncate text-sm font-semibold">
+                              {platform}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => addPlatform(platform)}
+                            className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-lg border border-[#dcd9e4] px-3 text-xs font-semibold text-[#5f2ed0] hover:border-[#bda5f4]"
+                          >
+                            <Icon name="plus" />
+                            Add
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                  {errors.form && <FieldError>{errors.form}</FieldError>}
+                  {validationMessages.length ? (
+                    <section
+                      role="alert"
+                      className="rounded-xl border border-[#f1d1d1] bg-[#fff7f7] px-3.5 py-3 text-sm text-[#8c2727]"
+                    >
+                      <p className="font-semibold">Review these fields:</p>
+                      <ul className="mt-2 list-disc space-y-1 pl-5">
+                        {validationMessages.map((message) => (
+                          <li key={message}>{message}</li>
+                        ))}
+                      </ul>
+                    </section>
+                  ) : null}
+                  {notice && (
+                    <p
+                      role="alert"
+                      className="rounded-xl border border-[#f1d1d1] bg-[#fff7f7] px-3.5 py-3 text-sm text-[#a12c2c]"
+                    >
+                      {notice}
+                    </p>
+                  )}
+                  <div className="mt-8 flex flex-col-reverse gap-3 border-t border-[#efeff2] pt-6 sm:flex-row sm:justify-end">
+                    <button
+                      type="button"
+                      onClick={saveAndExit}
+                      disabled={saving}
+                      className="min-h-12 rounded-xl border border-[#d9dce3] px-6 text-sm font-medium text-[#30333b] disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      Save &amp; Exit
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={saving}
+                      className="min-h-12 rounded-xl bg-[#6731dc] px-7 text-sm font-medium text-white shadow-[0_8px_18px_rgba(99,48,220,0.18)] disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {saving ? (
+                        "Saving..."
+                      ) : (
+                        <>
+                          Save &amp; Continue <span className="ml-1">→</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              </section>
+              {hasFacebook ? <FacebookHelp /> : <InstagramHelp />}
+            </div>
+          </div>
+        </div>
+      </div>
+      {pendingRemoval &&
+        (() => {
+          const account = accounts.find((item) => item.id === pendingRemoval);
+          if (!account) return null;
+          return (
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="remove-platform-title"
+              className="fixed inset-0 z-50 grid place-items-center bg-[#19152d]/20 p-5"
+            >
+              <div className="w-full max-w-sm rounded-2xl border border-[#e4dff0] bg-white p-6 shadow-[0_20px_60px_rgba(41,28,75,0.18)]">
+                <h2
+                  id="remove-platform-title"
+                  className="text-lg font-semibold"
+                >
+                  Remove {account.platform}?
+                </h2>
+                <p className="mt-2 text-sm leading-6 text-[#667084]">
+                  This will remove the platform from this profile.
+                </p>
+                <div className="mt-6 flex justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setPendingRemoval(null)}
+                    className="min-h-10 rounded-lg border border-[#d9dce3] px-4 text-sm font-medium"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => removePlatform(account.id)}
+                    className="min-h-10 rounded-lg bg-[#b62e40] px-4 text-sm font-medium text-white"
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+      {showPrimaryPrompt && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="primary-platform-title"
+          className="fixed inset-0 z-50 grid place-items-center bg-[#19152d]/20 p-5"
+        >
+          <div className="w-full max-w-sm rounded-2xl border border-[#e4dff0] bg-white p-6 shadow-[0_20px_60px_rgba(41,28,75,0.18)]">
+            <h2 id="primary-platform-title" className="text-lg font-semibold">
+              Select a primary platform
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-[#667084]">
+              Please select at least one primary platform before continuing.
+            </p>
+            <div className="mt-6 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowPrimaryPrompt(false)}
+                className="min-h-10 rounded-lg bg-[#6731dc] px-4 text-sm font-medium text-white"
+              >
+                Okay
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </main>
+  );
 }

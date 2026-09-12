@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
 import { getSupabaseClient } from '@/lib/supabase/client';
 
@@ -12,7 +12,6 @@ type FormValues = {
   city: string;
   dob: string;
   gender: string;
-  more: string;
   password: string;
   confirmPassword: string;
   termsAccepted: boolean;
@@ -25,7 +24,6 @@ const initialValues: FormValues = {
   city: '',
   dob: '',
   gender: '',
-  more: '',
   password: '',
   confirmPassword: '',
   termsAccepted: false,
@@ -160,7 +158,6 @@ export function CreatorSignupPage() {
             current_city: values.city.trim(),
             date_of_birth: values.dob,
             gender: values.gender,
-            more: values.more.trim() || '',
           },
         },
       });
@@ -202,10 +199,14 @@ export function CreatorSignupPage() {
     }
   };
 
+  useEffect(() => {
+    if (submitState === 'success') window.scrollTo({ top: 0, behavior: 'auto' });
+  }, [submitState]);
+
   return (
-    <div className="mx-auto max-w-[1440px] px-4 pb-14 pt-8 sm:px-6 lg:px-8 xl:px-12">
+    <div className="mx-auto max-w-[1440px] px-4 pb-14 pt-4 sm:px-6 sm:pt-8 lg:px-8 xl:px-12">
       <div className="grid items-start gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:gap-12 xl:gap-16">
-        <div className="pt-2">
+        <div className="order-2 pt-2 lg:order-1">
           <p className="text-[0.76rem] font-bold uppercase tracking-[0.24em] text-[#6a2cf0]">Create your account</p>
           <h1 className="mt-5 font-serif text-[clamp(3.2rem,5vw,6rem)] leading-[0.9] tracking-[-0.065em] text-black">
             Join <span className="text-[#7440f4]">CloutCo.</span>
@@ -262,7 +263,7 @@ export function CreatorSignupPage() {
           </div>
         </div>
 
-        <div className="rounded-[28px] border border-[#e8e2f2] bg-[#fbf7ff]/70 p-4 shadow-[0_12px_24px_rgba(70,48,112,0.04)] sm:p-6 lg:p-7">
+        <div className="order-1 rounded-[28px] border border-[#e8e2f2] bg-[#fbf7ff]/70 p-4 shadow-[0_12px_24px_rgba(70,48,112,0.04)] sm:p-6 lg:order-2 lg:p-7">
           <div className="mb-5">
             <h2 className="text-[2rem] font-semibold tracking-[-0.05em] text-black sm:text-[2.15rem]">Sign up to CloutCo</h2>
             <p className="mt-2 text-base text-[#4d5667]">
@@ -412,25 +413,6 @@ export function CreatorSignupPage() {
                   ))}
                 </select>
                 {showError('gender') && <p className="mt-1 text-sm text-[#d64d4d]">{errors.gender}</p>}
-              </div>
-            </div>
-
-            <div>
-              <label htmlFor="more" className="mb-1.5 block text-sm font-medium text-[#2b3242]">
-                More (Optional)
-              </label>
-              <textarea
-                id="more"
-                rows={3}
-                value={values.more}
-                maxLength={300}
-                onChange={(event) => updateField('more', event.target.value)}
-                placeholder="Tell us anything else you'd like us to know"
-                className="w-full resize-none rounded-xl border border-[#dfe4ef] bg-white px-3.5 py-3 text-base text-[#1c2330] outline-none transition placeholder:text-[#7b8295] focus:border-[#7b62ed]"
-              />
-              <div className="mt-1 flex items-center justify-between gap-3 text-xs text-[#667189]">
-                <span>You can share your niche, social handles, experience, or anything that helps.</span>
-                <span>{values.more.length}/300</span>
               </div>
             </div>
 
