@@ -324,6 +324,8 @@ export function ProfileSummaryCard({
   formats,
   styles,
   hasContent,
+  primaryAudienceCount,
+  primaryAudienceLabel = "Followers",
   onPhotoUpdated,
   portraitPanel = false,
   editablePhoto = false,
@@ -341,6 +343,8 @@ export function ProfileSummaryCard({
   formats: string[];
   styles: string[];
   hasContent: boolean;
+  primaryAudienceCount?: string;
+  primaryAudienceLabel?: string;
   onPhotoUpdated?: (photoUrl: string) => void;
   portraitPanel?: boolean;
   editablePhoto?: boolean;
@@ -435,6 +439,11 @@ export function ProfileSummaryCard({
                   <h1 className="mt-3 break-words text-[2.25rem] font-semibold leading-[0.98] tracking-[-0.065em] text-[#15131a] sm:text-[2.65rem]">
                     {displayName}
                   </h1>
+                )}
+                {primaryAudienceCount && (
+                  <p className="mt-3 whitespace-nowrap text-xl font-bold tracking-[-0.045em] text-[#1b1920] sm:text-2xl">
+                    {primaryAudienceCount} {primaryAudienceLabel}
+                  </p>
                 )}
                 {(creatorType || languages.length) && (
                   <p className="mt-3 text-sm leading-6 text-[#5c5765]">
@@ -1022,6 +1031,13 @@ export default function ProfilePreviewPage() {
   const primarySocialAccount = socialAccounts.find(
     (account) => account.isPrimary,
   );
+  const primaryAudienceCount = primarySocialAccount?.audienceCount?.trim()
+    ? formatCount(primarySocialAccount.audienceCount)
+    : "";
+  const primaryAudienceLabel =
+    platformKey(primarySocialAccount?.platform) === "youtube"
+      ? "Subscribers"
+      : "Followers";
   const secondarySocialAccounts = primarySocialAccount
     ? socialAccounts.filter((account) => account.id !== primarySocialAccount.id)
     : socialAccounts;
@@ -1087,6 +1103,8 @@ export default function ProfilePreviewPage() {
             formats={formats}
             styles={styles}
             hasContent={hasContent}
+            primaryAudienceCount={primaryAudienceCount}
+            primaryAudienceLabel={primaryAudienceLabel}
             onPhotoUpdated={setPhotoUrl}
             portraitPanel
             editablePhoto
