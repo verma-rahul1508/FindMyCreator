@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { AuthAwareLogo } from "@/components/auth-aware-logo";
+import { formatPlatformCount } from "@/lib/format-number";
 import { getSupabaseClient } from "@/lib/supabase/client";
 import {
   CompactSecondaryPlatformCard,
@@ -293,6 +294,13 @@ export default function PublicCreatorProfilePage() {
   const primarySocialAccount = socialAccounts.find(
     (account) => account.isPrimary,
   );
+  const primaryAudienceCount = primarySocialAccount?.audienceCount?.trim()
+    ? formatPlatformCount(primarySocialAccount.audienceCount)
+    : "";
+  const primaryAudienceLabel =
+    primarySocialAccount?.platform.trim().toLowerCase() === "youtube"
+      ? "Subscribers"
+      : "Followers";
   const secondarySocialAccounts = primarySocialAccount
     ? socialAccounts.filter((account) => account.id !== primarySocialAccount.id)
     : socialAccounts;
@@ -316,6 +324,8 @@ export default function PublicCreatorProfilePage() {
             formats={formats}
             styles={styles}
             hasContent={hasContent}
+            primaryAudienceCount={primaryAudienceCount}
+            primaryAudienceLabel={primaryAudienceLabel}
             portraitPanel
           />
         </div>
