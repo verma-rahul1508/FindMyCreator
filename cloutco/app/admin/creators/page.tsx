@@ -61,11 +61,6 @@ function formatAudience(value: number | string) {
   return new Intl.NumberFormat('en-US').format(audience);
 }
 
-function formatDate(value: string) {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? '—' : new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }).format(date);
-}
-
 function initials(value: string) {
   return value.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join('') || 'CC';
 }
@@ -76,6 +71,21 @@ function creatorTypeLabel(value: string | null) {
 
 function platformShortLabel(platform: string) {
   return platform === 'instagram' ? 'IG' : platform === 'facebook' ? 'FB' : 'YT';
+}
+
+function platformLabel(platform: string) {
+  return platform === 'instagram' ? 'Instagram' : platform === 'facebook' ? 'Facebook' : 'YouTube';
+}
+
+function primaryProfileUrl(creator: AdminCreatorListRow) {
+  const profileUrl = creator.platforms.find((platform) => platform.is_primary)?.profile_url?.trim();
+  if (!profileUrl) return '';
+  try {
+    const url = new URL(profileUrl);
+    return url.protocol === 'https:' || url.protocol === 'http:' ? url.toString() : '';
+  } catch {
+    return '';
+  }
 }
 
 function displayNiche(creator: AdminCreatorListRow) {
@@ -274,7 +284,7 @@ export default function AdminCreatorsPage() {
         return;
       }
 
-      const { data, error } = await supabase.rpc('admin_list_creators', {
+      const { data, error } = await supabase.rpc('admin_list_creators_with_contact', {
         p_search: debouncedSearch || null,
         p_status: status || null,
         p_city: city || null,
@@ -418,21 +428,42 @@ export default function AdminCreatorsPage() {
     </section>
 
     {(listError || countsError) ? <section className="mt-6 rounded-2xl border border-[#f0d7da] bg-[#fff8f8] px-5 py-6 text-center"><p className="text-sm font-medium text-[#8f3d47]">Unable to load creators right now.</p><button type="button" onClick={() => setRefreshKey((value) => value + 1)} className="mt-3 text-sm font-semibold text-[#6330dc]">Try again</button></section> : loading ? <section className="mt-6"><CreatorSkeleton /></section> : <>
-      <section className="mt-6 hidden overflow-hidden rounded-2xl border border-[#e8e7eb] bg-white shadow-[0_10px_30px_rgba(33,24,54,0.035)] lg:block">
-        <div className="grid grid-cols-[minmax(230px,1.6fr)_minmax(100px,.65fr)_minmax(100px,.7fr)_minmax(130px,.85fr)_minmax(130px,.85fr)_80px_100px_110px_84px] gap-4 border-b border-[#ebe9ef] bg-[#fcfbfd] px-5 py-3 text-[0.67rem] font-bold uppercase tracking-[0.12em] text-[#7b8190]">
-          <span>Creator</span><span>Location</span><span>Niche</span><span>Platforms</span><span>Audience</span><span>Profile</span><span>Status</span><span>Joined</span><span>Action</span>
+      <section className="mt-6 hidden overflow-x-auto rounded-2xl border border-[#e8e7eb] bg-white shadow-[0_10px_30px_rgba(33,24,54,0.035)] lg:block">
+        <div className="grid min-w-[1440px] grid-cols-[minmax(230px,1.6fr)_minmax(130px,.85fr)_minmax(100px,.65fr)_minmax(170px,1fr)_minmax(120px,.8fr)_minmax(120px,.8fr)_minmax(130px,.8fr)_100px_100px_84px] gap-4 border-b border-[#ebe9ef] bg-[#fcfbfd] px-5 py-3 text-[0.67rem] font-bold uppercase tracking-[0.12em] text-[#7b8190]">
+          <span>Creator</span><span>Phone</span><span>City</span><span>Audience</span><span>Primary Niche</span><span>Creator Type</span><span>Platforms</span><span>Status</span><span>Completion</span><span>Actions</span>
         </div>
-        {rows.map((creator) => <div key={creator.creator_id} className="grid grid-cols-[minmax(230px,1.6fr)_minmax(100px,.65fr)_minmax(100px,.7fr)_minmax(130px,.85fr)_minmax(130px,.85fr)_80px_100px_110px_84px] items-center gap-4 border-b border-[#f0eef3] px-5 py-4 last:border-b-0">
-          <div className="flex min-w-0 items-center gap-3"><div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#eee8ff] text-xs font-bold text-[#6330dc]">{initials(creator.display_name || creator.full_name)}</div><div className="min-w-0"><p className="truncate text-sm font-semibold text-[#25262b]">{creator.display_name || creator.full_name}</p><p className="truncate text-xs text-[#747b89]">{creatorTypeLabel(creator.creator_type)}{creator.username ? ` · @${creator.username}` : ''}</p></div></div>
-          <p className="truncate text-sm text-[#555b67]">{creator.current_city || '—'}</p><p className="truncate text-sm text-[#555b67]">{displayNiche(creator)}</p>
+        {rows.map((creator) => <div key={creator.creator_id} className="grid min-w-[1440px] grid-cols-[minmax(230px,1.6fr)_minmax(130px,.85fr)_minmax(100px,.65fr)_minmax(170px,1fr)_minmax(120px,.8fr)_minmax(120px,.8fr)_minmax(130px,.8fr)_100px_100px_84px] items-center gap-4 border-b border-[#f0eef3] px-5 py-4 last:border-b-0">
+          <div className="flex min-w-0 items-center gap-3"><div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#eee8ff] text-xs font-bold text-[#6330dc]">{initials(creator.display_name || creator.full_name)}</div><div className="min-w-0">{primaryProfileUrl(creator) ? <a href={primaryProfileUrl(creator)} target="_blank" rel="noopener noreferrer" className="block truncate text-sm font-semibold text-[#25262b] transition hover:text-[#6330dc] hover:underline">{creator.display_name || creator.full_name}</a> : <p className="truncate text-sm font-semibold text-[#25262b]">{creator.display_name || creator.full_name}</p>}<p className="truncate text-xs text-[#747b89]">{creatorTypeLabel(creator.creator_type)}{creator.username ? ` · @${creator.username}` : ''}</p></div></div>
+          <p className="break-words text-sm text-[#555b67]">{creator.phone_number || '—'}</p><p className="truncate text-sm text-[#555b67]">{creator.current_city || '—'}</p>
+          <div className="space-y-1 text-xs leading-4 text-[#555b67]">{creator.platforms.length ? creator.platforms.map((item) => <p key={item.platform} className="flex items-baseline justify-between gap-2"><span>{platformLabel(item.platform)}</span><span className="whitespace-nowrap font-medium">{formatAudience(item.audience_count)} followers</span></p>) : '—'}</div>
+          <p className="truncate text-sm text-[#555b67]">{displayNiche(creator)}</p><p className="truncate text-sm text-[#555b67]">{creatorTypeLabel(creator.creator_type)}</p>
           <div className="flex flex-wrap gap-1">{creator.platforms.map((item) => <span key={item.platform} className="rounded-md bg-[#f5f3f8] px-1.5 py-1 text-[0.65rem] font-bold text-[#5e6470]">{platformShortLabel(item.platform)}</span>)}</div>
-          <p className="text-xs leading-5 text-[#555b67]">{creator.platforms.map((item) => `${platformShortLabel(item.platform)} ${formatAudience(item.audience_count)}`).join(' · ') || '—'}</p>
-          <p className="text-sm font-medium text-[#3d414a]">{creator.completed_sections} / {creator.total_required_sections}</p><StatusBadge status={creator.status} /><p className="text-sm text-[#555b67]">{formatDate(creator.created_at)}</p><Link href={`/admin/creators/${creator.creator_id}`} className="text-left text-sm font-semibold text-[#6330dc]">Review →</Link>
+          <StatusBadge status={creator.status} /><p className="text-sm font-medium text-[#3d414a]">{creator.completed_sections} / {creator.total_required_sections}</p><Link href={`/admin/creators/${creator.creator_id}`} className="text-left text-sm font-semibold text-[#6330dc]">Review →</Link>
         </div>)}
       </section>
 
       <section className="mt-6 space-y-3 lg:hidden">
-        {rows.map((creator) => <article key={creator.creator_id} className="rounded-2xl border border-[#e8e7eb] bg-white p-4 shadow-[0_8px_20px_rgba(33,24,54,0.03)]"><div className="flex items-start gap-3"><div className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#eee8ff] text-xs font-bold text-[#6330dc]">{initials(creator.display_name || creator.full_name)}</div><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-[#25262b]">{creator.display_name || creator.full_name}</p><p className="mt-0.5 truncate text-xs text-[#747b89]">{creatorTypeLabel(creator.creator_type)}{creator.username ? ` · @${creator.username}` : ''}</p></div><StatusBadge status={creator.status} /></div><div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 text-xs"><p><span className="block font-medium text-[#8a909b]">Location</span><span className="mt-1 block text-[#4f5561]">{creator.current_city || '—'}</span></p><p><span className="block font-medium text-[#8a909b]">Niche</span><span className="mt-1 block truncate text-[#4f5561]">{displayNiche(creator)}</span></p><p><span className="block font-medium text-[#8a909b]">Audience</span><span className="mt-1 block text-[#4f5561]">{creator.platforms.map((item) => `${platformShortLabel(item.platform)} ${formatAudience(item.audience_count)}`).join(' · ') || '—'}</span></p><p><span className="block font-medium text-[#8a909b]">Profile</span><span className="mt-1 block text-[#4f5561]">{creator.completed_sections} / {creator.total_required_sections}</span></p></div><div className="mt-4 flex items-center justify-between border-t border-[#f0eef3] pt-3"><div className="flex gap-1">{creator.platforms.map((item) => <span key={item.platform} className="rounded-md bg-[#f5f3f8] px-1.5 py-1 text-[0.65rem] font-bold text-[#5e6470]">{platformShortLabel(item.platform)}</span>)}</div><Link href={`/admin/creators/${creator.creator_id}`} className="text-sm font-semibold text-[#6330dc]">Review →</Link></div></article>)}
+        {rows.map((creator) => {
+          const profileUrl = primaryProfileUrl(creator);
+          return <article key={creator.creator_id} className="rounded-2xl border border-[#e8e7eb] bg-white p-4 shadow-[0_8px_20px_rgba(33,24,54,0.03)]">
+            <div className="flex items-start gap-3">
+              <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#eee8ff] text-xs font-bold text-[#6330dc]">{initials(creator.display_name || creator.full_name)}</div>
+              <div className="min-w-0 flex-1">
+                {profileUrl ? <a href={profileUrl} target="_blank" rel="noopener noreferrer" className="block truncate text-sm font-semibold text-[#25262b] hover:text-[#6330dc] hover:underline">{creator.display_name || creator.full_name}</a> : <p className="truncate text-sm font-semibold text-[#25262b]">{creator.display_name || creator.full_name}</p>}
+                <p className="mt-0.5 truncate text-xs text-[#747b89]">{creatorTypeLabel(creator.creator_type)}{creator.username ? ` · @${creator.username}` : ''}</p>
+              </div>
+              <StatusBadge status={creator.status} />
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 text-xs">
+              <p><span className="block font-medium text-[#8a909b]">Phone</span><span className="mt-1 block break-words text-[#4f5561]">{creator.phone_number || '—'}</span></p>
+              <p><span className="block font-medium text-[#8a909b]">City</span><span className="mt-1 block text-[#4f5561]">{creator.current_city || '—'}</span></p>
+              <p><span className="block font-medium text-[#8a909b]">Niche</span><span className="mt-1 block truncate text-[#4f5561]">{displayNiche(creator)}</span></p>
+              <p><span className="block font-medium text-[#8a909b]">Completion</span><span className="mt-1 block text-[#4f5561]">{creator.completed_sections} / {creator.total_required_sections}</span></p>
+              <div className="col-span-2"><span className="block font-medium text-[#8a909b]">Audience</span><div className="mt-1 space-y-1 text-[#4f5561]">{creator.platforms.length ? creator.platforms.map((item) => <p key={item.platform}>{platformLabel(item.platform)} <span className="font-medium">{formatAudience(item.audience_count)} followers</span></p>) : '—'}</div></div>
+            </div>
+            <div className="mt-4 flex items-center justify-between border-t border-[#f0eef3] pt-3"><div className="flex gap-1">{creator.platforms.map((item) => <span key={item.platform} className="rounded-md bg-[#f5f3f8] px-1.5 py-1 text-[0.65rem] font-bold text-[#5e6470]">{platformShortLabel(item.platform)}</span>)}</div><Link href={`/admin/creators/${creator.creator_id}`} className="text-sm font-semibold text-[#6330dc]">Review →</Link></div>
+          </article>;
+        })}
       </section>
 
       {!rows.length && <section className="mt-6 rounded-2xl border border-dashed border-[#dcd8e4] bg-white px-5 py-14 text-center"><p className="text-base font-semibold text-[#33353c]">{hasActiveFilters ? 'No creators match your current filters.' : 'No creators found.'}</p>{hasActiveFilters && <button type="button" onClick={clearAll} className="mt-3 text-sm font-semibold text-[#6330dc]">Clear filters</button>}</section>}

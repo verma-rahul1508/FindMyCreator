@@ -2,6 +2,7 @@ export type AdminCreatorPlatform = {
   platform: 'instagram' | 'facebook' | 'youtube';
   audience_count: number | string;
   is_primary: boolean;
+  profile_url: string | null;
 };
 
 export type AdminCreatorListRow = {
@@ -10,6 +11,7 @@ export type AdminCreatorListRow = {
   display_name: string | null;
   username: string | null;
   full_name: string;
+  phone_number: string | null;
   current_city: string;
   primary_niche: string | null;
   primary_niche_other: string | null;

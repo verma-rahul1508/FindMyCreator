@@ -179,7 +179,7 @@ export default function SigninPage() {
                 </div>
 
                 <div className="-mt-1 flex justify-end">
-                  <span className="text-sm text-[#a2a5ad]">Forgot password?</span>
+                  <Link href="/forgot-password" className="text-sm font-medium text-[#6330dc] hover:underline">Forgot password?</Link>
                 </div>
 
                 {error && <div className="rounded-[8px] border border-[#f1d1d1] bg-[#fff7f7] px-3.5 py-3 text-sm leading-5 text-[#a12c2c]" role="alert">{error}</div>}
