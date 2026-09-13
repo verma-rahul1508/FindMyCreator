@@ -2,7 +2,7 @@ import { getSupabaseClient } from '@/lib/supabase/client';
 
 type Platform = 'Instagram' | 'Facebook' | 'YouTube';
 type Account = { id: string; platform: Platform; platformName: string; profileUrl: string; username: string; audienceCount: string; isPrimary: boolean; instagramInsights?: unknown; facebookInsights?: unknown; youtubeInsights?: unknown };
-type PlatformRow = { id: string; platform: string; profile_url: string; username: string | null; audience_count: number | string; is_primary: boolean };
+type PlatformRow = { id: string; platform: string; profile_url: string | null; username: string | null; audience_count: number | string | null; is_primary: boolean };
 type SnapshotRow = { id: string; social_platform_id: string; platform: string };
 type InstagramAnalyticsRow = { snapshot_id: string; views_all_content: number | string | null; net_followers: number | string | null; interactions: number | string | null; viewers_total: number | string | null; profile_visits: number | string | null; women_percentage: number | string | null; men_percentage: number | string | null };
 type FacebookAnalyticsRow = { snapshot_id: string; views_total: number | string | null; viewers: number | string | null; engagement_total: number | string | null; net_followers: number | string | null; women_percentage: number | string | null; men_percentage: number | string | null };
@@ -95,7 +95,7 @@ export async function loadSocialAccounts(creatorId: string): Promise<Account[]> 
 
   return platforms.map((platformRow) => {
     const platform = platformLabel(platformRow.platform);
-    const account: Account = { id: platformRow.id, platform, platformName: platform, profileUrl: platformRow.profile_url, username: platformRow.username || '', audienceCount: text(platformRow.audience_count), isPrimary: platformRow.is_primary };
+    const account: Account = { id: platformRow.id, platform, platformName: platform, profileUrl: platformRow.profile_url || '', username: platformRow.username || '', audienceCount: text(platformRow.audience_count), isPrimary: platformRow.is_primary };
     if (platform === 'YouTube') {
       const analytics = youtubeByPlatform.get(platformRow.id);
       return analytics ? { ...account, youtubeInsights: { views: text(analytics.views), likes: text(analytics.likes), shares: text(analytics.shares), topCountry: analytics.top_country || '' } } : account;

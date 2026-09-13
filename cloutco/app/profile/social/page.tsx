@@ -7,7 +7,6 @@ import { useRouter } from "next/navigation";
 import { AuthAwareLogo } from "@/components/auth-aware-logo";
 import { AuthenticatedCreatorHeaderIdentity } from "@/components/authenticated-creator-header-identity";
 import { getSupabaseClient } from "@/lib/supabase/client";
-import { getNextProfileRoute } from "@/lib/profile-sections";
 import {
   loadSocialAccounts,
   saveSocialAccounts,
@@ -89,7 +88,6 @@ type PlatformAccount = {
 type FieldErrors = Record<string, string>;
 
 const platforms: Platform[] = ["Instagram", "Facebook", "YouTube"];
-const storageKey = "cloutco-social-platforms-draft";
 const contentTypes = ["Posts", "Reels", "Stories", "Live Videos"];
 const ageRanges = ["13–17", "18–24", "25–34", "35–44", "45–54", "55–64", "65+"];
 const emptyInsights = (): InstagramInsights => ({
@@ -176,29 +174,6 @@ const emptyYouTubeInsights = (): YouTubeInsights => ({
   shares: "",
   topCountry: "",
 });
-const defaults: PlatformAccount[] = [
-  {
-    id: "instagram",
-    platform: "Instagram",
-    platformName: "Instagram",
-    profileUrl: "",
-    username: "",
-    audienceCount: "",
-    isPrimary: true,
-    instagramInsights: emptyInsights(),
-  },
-  {
-    id: "youtube",
-    platform: "YouTube",
-    platformName: "YouTube",
-    profileUrl: "",
-    username: "",
-    audienceCount: "",
-    isPrimary: false,
-    youtubeInsights: emptyYouTubeInsights(),
-  },
-];
-
 function normaliseInsights(value?: InstagramInsights): InstagramInsights {
   const base = emptyInsights();
   const legacyAudience = value?.audience as
@@ -1462,11 +1437,11 @@ function FacebookHelp() {
 
 export default function SocialPlatformsPage() {
   const router = useRouter();
-  const [accounts, setAccounts] = useState<PlatformAccount[]>(defaults);
+  const [accounts, setAccounts] = useState<PlatformAccount[]>([]);
   const [creatorId, setCreatorId] = useState("");
   const [loading, setLoading] = useState(true);
   const [pendingRemoval, setPendingRemoval] = useState<string | null>(null);
-  const [errors, setErrors] = useState<FieldErrors>({});
+  const [errors] = useState<FieldErrors>({});
   const [notice, setNotice] = useState("");
   const [showPrimaryPrompt, setShowPrimaryPrompt] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -1535,8 +1510,6 @@ export default function SocialPlatformsPage() {
   const availablePlatforms = platforms.filter(
     (platform) => !addedPlatforms.has(platform),
   );
-  const persist = (next = accounts) =>
-    window.sessionStorage.setItem(storageKey, JSON.stringify(next));
   const updateAccount = (id: string, changes: Partial<PlatformAccount>) => {
     const definedChanges = Object.fromEntries(
       Object.entries(changes).filter(([, value]) => value !== undefined),
@@ -1546,14 +1519,6 @@ export default function SocialPlatformsPage() {
         account.id === id ? { ...account, ...definedChanges } : account,
       ),
     );
-    setErrors((current) => ({
-      ...current,
-      [`${id}-url`]: "",
-      [`${id}-count`]: "",
-      [`${id}-instagram`]: "",
-      [`${id}-facebook`]: "",
-      [`${id}-youtube`]: "",
-    }));
   };
   const setPrimary = (id: string, checked = true) =>
     setAccounts((current) =>
@@ -1577,7 +1542,7 @@ export default function SocialPlatformsPage() {
         profileUrl: "",
         username: "",
         audienceCount: "",
-        isPrimary: current.length === 0,
+        isPrimary: platform === "Instagram" && current.length === 0,
         ...(platform === "Instagram"
           ? { instagramInsights: emptyInsights() }
           : platform === "Facebook"
@@ -1708,27 +1673,17 @@ export default function SocialPlatformsPage() {
       if (account.isPrimary && account.platform === "YouTube")
         validateYouTube(account, next);
     });
-    setErrors(next);
-    return Object.keys(next).length === 0;
+    return true;
   };
   const canSave = () => {
-    setNotice("");
-    if (accounts.length && !accounts.some((account) => account.isPrimary)) {
-      setShowPrimaryPrompt(true);
-      return false;
-    }
-    if (!validate()) {
-      setNotice("Fix the fields listed below before saving.");
-      return false;
-    }
-    return true;
+    return validate();
   };
   const saveToDatabase = async () => {
     if (saving || !canSave() || !creatorId) return false;
+    setNotice("");
     setSaving(true);
     try {
       await saveSocialAccounts(creatorId, accounts);
-      persist();
       return true;
     } catch (error) {
       setNotice(
@@ -1748,18 +1703,7 @@ export default function SocialPlatformsPage() {
   const saveAndContinue = () => {
     void saveToDatabase().then((saved) => {
       if (saved) {
-        window.sessionStorage.setItem(
-          "cloutco-social-platforms-complete",
-          "true",
-        );
-        router.push(
-          getNextProfileRoute({
-            "Basic Information": true,
-            "Creator Identity": true,
-            "Content & Niche": true,
-            "Social Platforms": true,
-          }),
-        );
+        router.push("/profile");
       }
     });
   };
