@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
 import { AuthAwareLogo } from '@/components/auth-aware-logo';
 import { getSupabaseClient } from '@/lib/supabase/client';
 
@@ -17,7 +17,8 @@ function LockIcon() {
 }
 
 export default function ResetPasswordPage() {
-  const [supabase] = useState(() => getSupabaseClient());
+  const [supabase] = useState(() => getSupabaseClient({ detectSessionInUrl: false }));
+  const recoveryUserId = useRef<string | null>(null);
   const [recoveryState, setRecoveryState] = useState<RecoveryState>(() => (supabase ? 'checking' : 'invalid'));
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -29,20 +30,70 @@ export default function ResetPasswordPage() {
     if (!supabase) return;
 
     let isActive = true;
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (!isActive) return;
-      if (event === 'PASSWORD_RECOVERY' && session) setRecoveryState('ready');
-      if (event === 'SIGNED_OUT') setRecoveryState('invalid');
-    });
 
-    void supabase.auth.getSession().then(({ data, error: sessionError }) => {
+    const establishRecoverySession = async (session: { access_token: string }) => {
+      const { data, error: userError } = await supabase.auth.getUser(session.access_token);
       if (!isActive) return;
-      setRecoveryState(!sessionError && data.session ? 'ready' : 'invalid');
-    });
+      if (userError || !data.user) {
+        console.error('[reset-password] recovery session validation failed');
+        setRecoveryState('invalid');
+        return;
+      }
+
+      recoveryUserId.current = data.user.id;
+      setRecoveryState('ready');
+    };
+
+    const establishFromRecoveryLink = async () => {
+      const url = new URL(window.location.href);
+      const code = url.searchParams.get('code');
+      const hash = new URLSearchParams(url.hash.replace(/^#/, ''));
+      const accessToken = hash.get('access_token');
+      const refreshToken = hash.get('refresh_token');
+      const isRecoveryHash = hash.get('type') === 'recovery' && Boolean(accessToken && refreshToken);
+
+      if (code) {
+        console.info('[reset-password] recovery code present');
+        const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+        if (!isActive) return;
+        if (exchangeError || !data.session) {
+          console.error('[reset-password] recovery code exchange failed');
+          setRecoveryState('invalid');
+          return;
+        }
+
+        url.searchParams.delete('code');
+        window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+        await establishRecoverySession(data.session);
+        return;
+      }
+
+      if (isRecoveryHash && accessToken && refreshToken) {
+        console.info('[reset-password] recovery hash present');
+        const { data, error: sessionError } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        });
+        if (!isActive) return;
+        if (sessionError || !data.session) {
+          console.error('[reset-password] recovery hash session setup failed');
+          setRecoveryState('invalid');
+          return;
+        }
+
+        window.history.replaceState({}, '', `${url.pathname}${url.search}`);
+        await establishRecoverySession(data.session);
+        return;
+      }
+
+      console.info('[reset-password] recovery parameters unavailable');
+      setRecoveryState('invalid');
+    };
+
+    void establishFromRecoveryLink();
 
     return () => {
       isActive = false;
-      subscription.unsubscribe();
     };
   }, [supabase]);
 
@@ -68,12 +119,26 @@ export default function ResetPasswordPage() {
       return;
     }
 
+    if (recoveryState !== 'ready' || !recoveryUserId.current) {
+      setRecoveryState('invalid');
+      return;
+    }
+
     setIsSubmitting(true);
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    if (userError || !userData.user || userData.user.id !== recoveryUserId.current) {
+      console.error('[reset-password] recovery user validation failed before update');
+      setIsSubmitting(false);
+      setRecoveryState('invalid');
+      return;
+    }
+
     const { error: updateError } = await supabase.auth.updateUser({ password });
     setIsSubmitting(false);
 
     if (updateError) {
-      if (updateError.message.toLowerCase().includes('session')) {
+      console.error('[reset-password] updateUser failed');
+      if (/(session|jwt|token|user.+does not exist)/i.test(updateError.message)) {
         setRecoveryState('invalid');
       } else {
         setError('We could not update your password. Please try again.');

@@ -30,6 +30,13 @@ const initialValues: FormValues = {
 };
 
 const genderOptions = ['Male', 'Female', 'Non-binary', 'Prefer not to say'];
+const existingAccountMessage = 'An account with this email already exists. Please sign in instead.';
+
+function isExistingAccountError(error: unknown) {
+  if (!(error instanceof Error)) return false;
+
+  return /user already registered|email.+already.+(?:registered|exists)/i.test(error.message);
+}
 
 function getPasswordStrength(password: string) {
   if (!password) return { label: '', tone: 'bg-transparent' };
@@ -44,6 +51,7 @@ export function CreatorSignupPage() {
   const [submitState, setSubmitState] = useState<'idle' | 'loading' | 'success'>('idle');
   const [submittedEmail, setSubmittedEmail] = useState('');
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [emailSignupError, setEmailSignupError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
@@ -109,6 +117,7 @@ export function CreatorSignupPage() {
 
   const updateField = (field: keyof FormValues, value: string | boolean) => {
     setValues((current) => ({ ...current, [field]: value }));
+    if (field === 'email') setEmailSignupError('');
     if (touched[field] || field === 'termsAccepted') {
       setTouched((current) => ({ ...current, [field]: true }));
     }
@@ -129,6 +138,7 @@ export function CreatorSignupPage() {
     };
     setTouched(nextTouched);
     setNotification(null);
+    setEmailSignupError('');
 
     if (Object.keys(errors).length > 0) {
       return;
@@ -165,14 +175,9 @@ export function CreatorSignupPage() {
       });
 
       if (signUpError) {
-        const message = signUpError.message.toLowerCase();
-
-        if (message.includes('already') || message.includes('registered')) {
+        if (isExistingAccountError(signUpError)) {
           setSubmitState('idle');
-          setNotification({
-            type: 'error',
-            text: 'An account with this email already exists. Please sign in instead.',
-          });
+          setEmailSignupError(existingAccountMessage);
           return;
         }
 
@@ -185,6 +190,12 @@ export function CreatorSignupPage() {
         throw new Error('Unable to create auth user.');
       }
 
+      if (!signUpData.session && authUser.identities?.length === 0) {
+        setSubmitState('idle');
+        setEmailSignupError(existingAccountMessage);
+        return;
+      }
+
       setValues(initialValues);
       setTouched({});
       setSubmittedEmail(confirmationEmail);
@@ -192,12 +203,14 @@ export function CreatorSignupPage() {
       setNotification(null);
     } catch (error) {
       setSubmitState('idle');
-      const message = error instanceof Error ? error.message : 'Unable to create your account right now.';
+      if (isExistingAccountError(error)) {
+        setEmailSignupError(existingAccountMessage);
+        return;
+      }
+
       setNotification({
         type: 'error',
-        text: message.includes('duplicate') || message.includes('already') || message.includes('registered')
-          ? 'An account with this email already exists. Please sign in instead.'
-          : 'We could not create your account. Please review your details and try again.',
+        text: 'We could not create your account. Please review your details and try again.',
       });
     }
   };
@@ -327,10 +340,10 @@ export function CreatorSignupPage() {
                   placeholder="Enter your email address"
                   autoComplete="email"
                   className={`w-full rounded-xl border bg-white px-3.5 py-3 text-base text-[#1c2330] outline-none transition placeholder:text-[#7b8295] ${
-                    showError('email') ? 'border-[#d64d4d] focus:border-[#d64d4d]' : 'border-[#dfe4ef] focus:border-[#7b62ed]'
+                    showError('email') || emailSignupError ? 'border-[#d64d4d] focus:border-[#d64d4d]' : 'border-[#dfe4ef] focus:border-[#7b62ed]'
                   }`}
                 />
-                {showError('email') && <p className="mt-1 text-sm text-[#d64d4d]">{errors.email}</p>}
+                {(showError('email') || emailSignupError) && <p className="mt-1 text-sm text-[#d64d4d]">{errors.email || emailSignupError}</p>}
               </div>
             </div>
 

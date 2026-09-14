@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 
-export function getSupabaseClient() {
+export function getSupabaseClient({ detectSessionInUrl = true }: { detectSessionInUrl?: boolean } = {}) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabasePublishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
@@ -12,7 +12,7 @@ export function getSupabaseClient() {
     auth: {
       persistSession: true,
       autoRefreshToken: true,
-      detectSessionInUrl: true,
+      detectSessionInUrl,
     },
   });
 }
