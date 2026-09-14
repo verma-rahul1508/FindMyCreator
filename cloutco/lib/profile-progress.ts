@@ -74,6 +74,7 @@ type YouTubeAnalyticsRecord = {
 
 export type ProfileSectionProgress = ProfileSection & {
   completed: boolean;
+  started: boolean;
 };
 
 export type CreatorProfileProgress = {
@@ -294,7 +295,18 @@ export async function loadCreatorProfileProgress(): Promise<CreatorProfileProgre
     'social-platforms': isSocialPlatformsComplete(platforms, latestSnapshots, instagramAnalytics, instagramTopAgeRangeCounts, instagramTopLocationCounts, facebookAnalytics, facebookTopAgeGroupCounts, facebookTopLocationCounts, youtubeAnalytics),
   };
 
-  const sections = profileSections.map((section) => ({ ...section, completed: completedByKey[section.key] }));
+  const startedByKey: Record<ProfileSectionKey, boolean> = {
+    'basic-information': Boolean(creator),
+    'creator-identity': Boolean(identityResult.data),
+    'content-and-niche': Boolean(contentResult.data),
+    'social-platforms': platforms.length > 0,
+  };
+
+  const sections = profileSections.map((section) => ({
+    ...section,
+    completed: completedByKey[section.key],
+    started: startedByKey[section.key],
+  }));
   const requiredSections = sections.filter((section) => section.required);
   const requiredCompletedCount = requiredSections.filter((section) => section.completed).length;
 

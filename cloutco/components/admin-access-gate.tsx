@@ -16,6 +16,10 @@ function CreatorsIcon() {
   return <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5 fill-none stroke-current stroke-[1.7]"><circle cx="9" cy="8" r="3" /><path d="M3.8 19c.5-3.1 2.3-4.8 5.2-4.8s4.7 1.7 5.2 4.8M16.5 5.5c2.1 0 3.7 1.5 3.7 3.6 0 1.6-.9 2.8-2.3 3.4M17.2 14.4c1.9.3 3.1 1.8 3.4 4.1" /></svg>;
 }
 
+function BrandsIcon() {
+  return <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5 fill-none stroke-current stroke-[1.7]"><path d="M5 8.2 12 4l7 4.2v7.6L12 20l-7-4.2V8.2Z" /><path d="M5 8.2 12 12l7-3.8M12 12v8" /></svg>;
+}
+
 function AnalyticsIcon() {
   return <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5 fill-none stroke-current stroke-[1.7]"><path d="M4 19.5V5.5M4 19.5h16" /><path d="m7.5 15.5 3.2-3.2 2.7 1.8 4.1-5" /><path d="M15.8 9.1h1.9V11" /></svg>;
 }
@@ -41,6 +45,7 @@ function AdminNavigation({ email, onSignOut, onNavigate }: { email: string | nul
   const searchParams = useSearchParams();
   const navigationItemClassName = (active: boolean) => `flex items-center gap-3 rounded-xl px-3.5 py-3 text-sm transition ${active ? 'bg-[#f1ebff] font-semibold text-[#6330dc]' : 'font-medium text-[#515764] hover:bg-[#f8f6fb] hover:text-[#26282e]'}`;
   const creatorsActive = pathname.startsWith('/admin/creators');
+  const brandsActive = pathname.startsWith('/admin/brands');
   const pendingReviewActive = searchParams.get('status') === 'pending';
   const allCreatorsActive = creatorsActive && !searchParams.get('status');
 
@@ -59,6 +64,7 @@ function AdminNavigation({ email, onSignOut, onNavigate }: { email: string | nul
           <Link href="/admin/creators?status=pending" onClick={onNavigate} className={`block rounded-lg px-2 py-2 text-xs transition ${pendingReviewActive ? 'font-semibold text-[#6330dc]' : 'text-[#697080] hover:bg-[#f8f6fb] hover:text-[#32343a]'}`}>Pending Review</Link>
         </div>
       </div>
+      <Link href="/admin/brands" onClick={onNavigate} className={navigationItemClassName(brandsActive)}><BrandsIcon />Brands</Link>
       <Link href="/admin/analytics" onClick={onNavigate} className={navigationItemClassName(pathname === '/admin/analytics')}><AnalyticsIcon />Analytics</Link>
       <Link href="/admin/reports" onClick={onNavigate} className={navigationItemClassName(pathname === '/admin/reports')}><ReportsIcon />Reports</Link>
     </nav>

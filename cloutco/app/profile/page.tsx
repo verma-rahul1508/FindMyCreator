@@ -811,15 +811,52 @@ function CreatorCard({
                 className="flex min-h-0 min-w-0 flex-col p-4 sm:p-5"
                 aria-labelledby="creator-card-insights"
               >
-                <p className="text-[0.6rem] font-bold uppercase tracking-[0.2em] text-[#6330dc]">
-                  Social Presence
-                </p>
-                <h2
-                  id="creator-card-insights"
-                  className="mt-1.5 text-[1.35rem] font-semibold leading-none tracking-[-0.055em] text-[#15121b] sm:text-[1.55rem]"
-                >
-                  Primary insights
-                </h2>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-[0.6rem] font-bold uppercase tracking-[0.2em] text-[#6330dc]">
+                      Social Presence
+                    </p>
+                    <h2
+                      id="creator-card-insights"
+                      className="mt-1.5 text-[1.35rem] font-semibold leading-none tracking-[-0.055em] text-[#15121b] sm:text-[1.55rem]"
+                    >
+                      Primary insights
+                    </h2>
+                  </div>
+                  <div className="hidden shrink-0 items-center gap-2 sm:flex">
+                    <CreatorCardAction
+                      icon="flip"
+                      label="Flip creator card"
+                      onClick={() => setIsFlipped(false)}
+                    />
+                    <CreatorCardAction
+                      icon="share"
+                      label="Share creator profile"
+                      onClick={() => void shareProfile()}
+                      filled
+                    />
+                  </div>
+                </div>
+                {shareStatus && (
+                  <p
+                    role="status"
+                    className="mt-2 text-right text-xs font-medium text-[#5630ae]"
+                  >
+                    {shareStatus}
+                  </p>
+                )}
+                {copyFallbackUrl && (
+                  <label className="mt-2 block text-xs text-[#5630ae]">
+                    Profile URL
+                    <input
+                      aria-label="Profile preview URL"
+                      readOnly
+                      value={copyFallbackUrl}
+                      onFocus={(event) => event.currentTarget.select()}
+                      className="mt-1 block w-full rounded border border-[#d9cdf4] bg-white px-2 py-1.5 text-[#3f354d]"
+                    />
+                  </label>
+                )}
                 {primaryInsightCards.length ? (
                   <div className="mt-3 grid flex-1 grid-cols-2 gap-2 sm:mt-4 sm:gap-3">
                     {primaryInsightCards.map((card) => (
@@ -848,21 +885,19 @@ function CreatorCard({
                     {primaryInsightsEmptyMessage}
                   </p>
                 )}
-                {!secondaryPlatformAccounts.length && (
-                  <div className="mt-auto flex items-center justify-end gap-2 pt-3 sm:pt-4">
-                    <CreatorCardAction
-                      icon="flip"
-                      label="Flip the Creator Card"
-                      onClick={() => setIsFlipped(false)}
-                    />
-                    <CreatorCardAction
-                      icon="share"
-                      label="Share it to someone"
-                      onClick={() => void shareProfile()}
-                      filled
-                    />
-                  </div>
-                )}
+                <div className="mt-auto flex items-center justify-end gap-2 pt-3 sm:hidden">
+                  <CreatorCardAction
+                    icon="flip"
+                    label="Flip creator card"
+                    onClick={() => setIsFlipped(false)}
+                  />
+                  <CreatorCardAction
+                    icon="share"
+                    label="Share creator profile"
+                    onClick={() => void shareProfile()}
+                    filled
+                  />
+                </div>
               </section>
               {secondaryPlatformAccounts.length ? (
                 <section
@@ -911,39 +946,6 @@ function CreatorCard({
                       </div>
                     ))}
                   </div>
-                  <div className="mt-auto flex items-center justify-end gap-2 pt-3 sm:pt-4">
-                    <CreatorCardAction
-                      icon="flip"
-                      label="Flip the Creator Card"
-                      onClick={() => setIsFlipped(false)}
-                    />
-                    <CreatorCardAction
-                      icon="share"
-                      label="Share it to someone"
-                      onClick={() => void shareProfile()}
-                      filled
-                    />
-                  </div>
-                  {shareStatus && (
-                    <p
-                      role="status"
-                      className="mt-2 text-center text-xs font-medium text-[#5630ae]"
-                    >
-                      {shareStatus}
-                    </p>
-                  )}
-                  {copyFallbackUrl && (
-                    <label className="mt-2 text-xs text-[#5630ae]">
-                      Profile URL
-                      <input
-                        aria-label="Profile preview URL"
-                        readOnly
-                        value={copyFallbackUrl}
-                        onFocus={(event) => event.currentTarget.select()}
-                        className="mt-1 block w-full rounded border border-[#d9cdf4] bg-white px-2 py-1.5 text-[#3f354d]"
-                      />
-                    </label>
-                  )}
                 </section>
               ) : null}
             </div>
@@ -1306,6 +1308,8 @@ export default function ProfilePage() {
                     >
                       {section.completed
                         ? "Completed"
+                        : section.started
+                          ? "Not Completed"
                         : section.required
                           ? "Not started"
                           : "Optional"}
