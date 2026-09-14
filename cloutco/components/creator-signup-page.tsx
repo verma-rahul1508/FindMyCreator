@@ -42,6 +42,7 @@ export function CreatorSignupPage() {
   const [values, setValues] = useState<FormValues>(initialValues);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [submitState, setSubmitState] = useState<'idle' | 'loading' | 'success'>('idle');
+  const [submittedEmail, setSubmittedEmail] = useState('');
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -147,8 +148,9 @@ export function CreatorSignupPage() {
     setSubmitState('loading');
 
     try {
+      const confirmationEmail = values.email.trim().toLowerCase();
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-        email: values.email.trim().toLowerCase(),
+        email: confirmationEmail,
         password: values.password,
         options: {
           emailRedirectTo: `${window.location.origin}/signin`,
@@ -185,6 +187,7 @@ export function CreatorSignupPage() {
 
       setValues(initialValues);
       setTouched({});
+      setSubmittedEmail(confirmationEmail);
       setSubmitState('success');
       setNotification(null);
     } catch (error) {
@@ -283,7 +286,9 @@ export function CreatorSignupPage() {
                 </svg>
               </span>
               <h3 className="mt-6 text-[2rem] font-semibold tracking-[-0.05em] text-black sm:text-[2.25rem]">Check your email to continue</h3>
-              <p className="mt-3 max-w-md text-base leading-7 text-[#4d5667]">We’ve sent a verification link to your email address. Please verify your email to continue to CloutCo.</p>
+              <p className="mt-3 max-w-md text-base leading-7 text-[#4d5667]">We sent a confirmation link to</p>
+              {submittedEmail ? <p className="mt-2 max-w-full break-all text-lg font-semibold text-[#25262b] sm:text-xl">{submittedEmail}</p> : <p className="mt-3 max-w-md text-base leading-7 text-[#4d5667]">your email address.</p>}
+              <p className="mt-3 max-w-md text-base leading-7 text-[#4d5667]">Please check your inbox and click the link to verify your email.</p>
               <p className="mt-3 max-w-md text-sm leading-6 text-[#667189]">Once your email is verified, you can sign in to your account.</p>
               <Link href="/signin" className="mt-8 inline-flex min-h-12 items-center justify-center rounded-xl bg-gradient-to-r from-[#5d2adf] to-[#7a58ea] px-6 text-base font-medium text-white shadow-[0_12px_24px_rgba(94,42,223,0.2)] transition hover:brightness-105">Go to Sign In <span aria-hidden="true" className="ml-2 text-lg">&rarr;</span></Link>
             </section>

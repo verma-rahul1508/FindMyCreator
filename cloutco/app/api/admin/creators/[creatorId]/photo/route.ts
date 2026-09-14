@@ -10,9 +10,10 @@ function denied() {
   return NextResponse.json({ error: 'Administrator access is required.' }, { status: 403, headers: { 'Cache-Control': 'no-store' } });
 }
 
-export async function GET(_request: Request, { params }: { params: Promise<{ creatorId: string }> }) {
+export async function GET(request: Request, { params }: { params: Promise<{ creatorId: string }> }) {
   const { creatorId } = await params;
-  const accessToken = (await cookies()).get(ADMIN_SESSION_COOKIE)?.value;
+  const bearerToken = request.headers.get('authorization')?.match(/^Bearer\s+(.+)$/i)?.[1]?.trim();
+  const accessToken = bearerToken || (await cookies()).get(ADMIN_SESSION_COOKIE)?.value;
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 

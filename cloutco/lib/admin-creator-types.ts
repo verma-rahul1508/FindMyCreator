@@ -21,6 +21,7 @@ export type AdminCreatorListRow = {
   created_at: string;
   completed_sections: number;
   total_required_sections: number;
+  last_30_days_views: number | string | null;
   total_count: number | string;
 };
 

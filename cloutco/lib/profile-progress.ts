@@ -188,10 +188,13 @@ function isSocialPlatformsComplete(
   facebookTopLocationCounts: Map<string, number>,
   youtubeAnalytics: Map<string, YouTubeAnalyticsRecord>,
 ) {
-  if (!platforms.length || !platforms.every((platform) => isHttpUrl(platform.profile_url) && isNonNegativeWholeNumber(platform.audience_count))) return false;
+  if (!platforms.length) return false;
 
-  const primaryPlatform = platforms.find((platform) => platform.is_primary);
-  if (!primaryPlatform) return false;
+  const primaryPlatforms = platforms.filter((platform) => platform.is_primary);
+  if (primaryPlatforms.length !== 1) return false;
+
+  const primaryPlatform = primaryPlatforms[0];
+  if (!isHttpUrl(primaryPlatform.profile_url) || !isNonNegativeWholeNumber(primaryPlatform.audience_count)) return false;
   if (primaryPlatform.platform === 'youtube') return isPersistedYouTubeAnalyticsComplete(youtubeAnalytics.get(primaryPlatform.id));
 
   const snapshot = latestSnapshots.get(primaryPlatform.id);

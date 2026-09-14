@@ -1679,7 +1679,12 @@ export default function SocialPlatformsPage() {
     return validate();
   };
   const saveToDatabase = async () => {
-    if (saving || !canSave() || !creatorId) return false;
+    if (saving || !creatorId) return false;
+    if (accounts.length && accounts.filter((account) => account.isPrimary).length !== 1) {
+      setShowPrimaryPrompt(true);
+      return false;
+    }
+    if (!canSave()) return false;
     setNotice("");
     setSaving(true);
     try {
