@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { languages, creatorTypes } from "@/lib/profile-form-options";
 import { ChangeEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AuthAwareLogo } from "@/components/auth-aware-logo";
@@ -30,27 +31,8 @@ type IconName =
   | "check"
   | "arrow"
   | "chevron";
-const languages = [
-  "English",
-  "Hindi",
-  "Tamil",
-  "Telugu",
-  "Bengali",
-  "Marathi",
-  "Gujarati",
-  "Kannada",
-  "Malayalam",
-  "Punjabi",
-  "Spanish",
-  "French",
-];
-const creatorTypes = [
-  ["content_creator", "Content Creator", "Create content for an audience"],
-  ["influencer", "Influencer", "Build community through your voice"],
-  ["ugc_creator", "UGC Creator", "Create authentic brand content"],
-  ["digital_creator", "Digital Creator", "Make digital-first experiences"],
-  ["other", "Other", "A creator type of your own"],
-] as const;
+
+
 const emptyIdentity: Identity = {
   profile_photo_url: null,
   display_name: "",

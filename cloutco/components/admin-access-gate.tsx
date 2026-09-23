@@ -61,6 +61,7 @@ function AdminNavigation({ email, onSignOut, onNavigate }: { email: string | nul
         <Link href="/admin/creators" onClick={onNavigate} className={navigationItemClassName(creatorsActive)}><CreatorsIcon />Creators</Link>
         <div className="ml-8 mt-1 space-y-1 border-l border-[#e7e2ef] pl-3">
           <Link href="/admin/creators" onClick={onNavigate} className={`block rounded-lg px-2 py-2 text-xs transition ${allCreatorsActive ? 'font-semibold text-[#6330dc]' : 'text-[#697080] hover:bg-[#f8f6fb] hover:text-[#32343a]'}`}>All Creators</Link>
+          <Link href="/admin/creators/new" onClick={onNavigate} className={`block rounded-lg px-2 py-2 text-xs transition ${pathname === '/admin/creators/new' ? 'font-semibold text-[#6330dc]' : 'text-[#697080] hover:bg-[#f8f6fb] hover:text-[#32343a]'}`}>Add Creator</Link>
           <Link href="/admin/creators?status=pending" onClick={onNavigate} className={`block rounded-lg px-2 py-2 text-xs transition ${pendingReviewActive ? 'font-semibold text-[#6330dc]' : 'text-[#697080] hover:bg-[#f8f6fb] hover:text-[#32343a]'}`}>Pending Review</Link>
         </div>
       </div>

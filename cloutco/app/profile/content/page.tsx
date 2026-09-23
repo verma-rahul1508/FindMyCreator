@@ -1,6 +1,8 @@
 'use client';
 
 import Link from 'next/link';
+import { SelectTile } from '@/components/profile-select-tile';
+import { niches, formats, styles } from '@/lib/profile-form-options';
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { ReactNode } from 'react';
@@ -8,9 +10,9 @@ import { AuthAwareLogo } from '@/components/auth-aware-logo';
 import { AuthenticatedCreatorHeaderIdentity } from '@/components/authenticated-creator-header-identity';
 import { getSupabaseClient } from '@/lib/supabase/client';
 
-const niches = ['Beauty', 'Fashion', 'Food & Beverage', 'Travel', 'Lifestyle', 'Fitness', 'Health & Wellness', 'Technology', 'Gaming', 'Finance', 'Business', 'Education', 'Parenting & Family', 'Entertainment', 'Comedy', 'Music', 'Art & Design', 'Photography', 'Automotive', 'Sports', 'Home & Interiors', 'Pets', 'Culture', 'DIY & Crafts', 'Other'];
-const formats = ['Reels / Short Videos', 'Long-form Videos', 'Stories', 'Photos', 'Carousels', 'Tutorials / How-to', 'Reviews', 'Vlogs', 'UGC', 'Livestreams', 'Podcasts', 'Written Content', 'Other'];
-const styles = ['Educational', 'Entertaining', 'Informative', 'Inspirational', 'Storytelling', 'Conversational', 'Tutorial / How-to', 'Review-focused', 'Promotional', 'Trend-driven', 'Cinematic', 'Relatable', 'Experimental', 'Other'];
+
+
+
 
 type FormState = { primary: string; primaryOther: string; otherNiches: string[]; otherNichesOther: string; contentFormats: string[]; contentFormatsOther: string; contentStyles: string[]; contentStylesOther: string };
 const emptyState: FormState = { primary: '', primaryOther: '', otherNiches: [], otherNichesOther: '', contentFormats: [], contentFormatsOther: '', contentStyles: [], contentStylesOther: '' };
@@ -39,9 +41,7 @@ function Icon({ name }: { name: IconName }) {
 function StepBadge({ value }: { value: string }) { return <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#f0eaff] text-sm font-semibold text-[#6430dc] shadow-[0_5px_14px_rgba(99,48,220,0.08)]">{value}</span>; }
 function FieldError({ children }: { children?: string }) { return children ? <p role="alert" className="mt-3 text-sm font-medium text-[#b22836]">{children}</p> : null; }
 
-function SelectTile({ label, selected, onClick }: { label: string; selected: boolean; onClick: () => void }) {
-  return <button type="button" aria-pressed={selected} onClick={onClick} className={`flex min-h-11 items-center gap-2.5 rounded-xl border px-3.5 py-2.5 text-left text-sm font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#6b30e8] ${selected ? 'border-[#8d68e9] bg-[#f4efff] text-[#6030d6] ring-1 ring-[#d9c9ff]' : 'border-[#e1e2e9] bg-white text-[#282d38] hover:border-[#cbbcf1] hover:bg-[#fcfbff]'}`}><span className={`h-1.5 w-1.5 rounded-full ${selected ? 'bg-[#6b30e8]' : 'bg-[#b7bdc8]'}`} />{label}</button>;
-}
+
 
 export default function ContentAndNichePage() {
   const router = useRouter();

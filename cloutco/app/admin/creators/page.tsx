@@ -204,6 +204,7 @@ export default function AdminCreatorsPage() {
   const requestedStatus = searchParams.get('status');
   const status: StatusFilter = requestedStatus === 'pending' || requestedStatus === 'active' || requestedStatus === 'rejected' ? requestedStatus : '';
   const [rows, setRows] = useState<AdminCreatorListRow[]>([]);
+  const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
   const [counts, setCounts] = useState<AdminCreatorStatusCounts | null>(null);
   const [filterCities, setFilterCities] = useState<string[]>([]);
   const [searchValue, setSearchValue] = useState('');
@@ -277,6 +278,7 @@ export default function AdminCreatorsPage() {
     let active = true;
     const loadCreators = async () => {
       setLoading(true);
+      setPhotoUrls({});
       const supabase = getSupabaseClient();
       if (!supabase) {
         if (active) {
@@ -326,6 +328,33 @@ export default function AdminCreatorsPage() {
     void loadCreators();
     return () => { active = false; };
   }, [bounds.max, bounds.min, city, completion, creatorType, debouncedSearch, effectiveSort, joinedAfterValue, niche, page, pageSize, platform, refreshKey, status]);
+
+  useEffect(() => {
+    if (loading) return;
+    const creatorIds = rows.filter((creator) => creator.profile_photo_url?.trim()).map((creator) => creator.creator_id);
+    if (!creatorIds.length) return;
+    let active = true;
+    const controller = new AbortController();
+    const loadPhotos = async () => {
+      const supabase = getSupabaseClient();
+      if (!supabase) return;
+      const { data } = await supabase.auth.getSession();
+      if (!active || !data.session) return;
+      const response = await fetch('/api/admin/creators/photos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${data.session.access_token}` },
+        body: JSON.stringify({ creatorIds }),
+        cache: 'no-store',
+        signal: controller.signal,
+      });
+      if (!response.ok) return;
+      const result = await response.json() as { urls: Record<string, string> };
+      if (active) setPhotoUrls(result.urls);
+    };
+    // Optional photos must never block the creator list.
+    void loadPhotos().catch(() => {});
+    return () => { active = false; controller.abort(); };
+  }, [rows, loading]);
 
   const updateStatus = useCallback((nextStatus: StatusFilter) => {
     setPage(1);
@@ -382,7 +411,7 @@ export default function AdminCreatorsPage() {
 
   return <section className="mx-auto w-full max-w-[1480px] px-5 py-9 sm:px-8 sm:py-12 lg:px-10 lg:py-14">
     <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#7C3AED]">Creator management</p>
-    <h1 className="mt-3 text-[2.15rem] font-semibold tracking-[-0.06em] text-[#151518] sm:text-[2.7rem]">Creator Management</h1>
+    <div className="mt-3 flex flex-wrap items-center justify-between gap-4"><h1 className="text-[2.15rem] font-semibold tracking-[-0.06em] text-[#151518] sm:text-[2.7rem]">Creator Management</h1><Link href="/admin/creators/new" className="inline-flex min-h-10 items-center rounded-lg bg-[#151518] px-4 text-sm font-semibold text-white">Add Creator</Link></div>
     <p className="mt-3 max-w-2xl text-sm leading-6 text-[#626a7a] sm:text-base">Review, search and manage the CloutCo creator network.</p>
 
     <div className="mt-8 grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -435,12 +464,12 @@ export default function AdminCreatorsPage() {
           <span>Creator</span><span>Phone</span><span>City</span><span>Audience</span><span>Last 30 Days Views</span><span>Primary Niche</span><span>Creator Type</span><span>Platforms</span><span>Status</span><span>Completion</span><span>Actions</span>
         </div>
         {rows.map((creator) => <div key={creator.creator_id} className="grid min-w-[1560px] grid-cols-[minmax(230px,1.6fr)_minmax(130px,.85fr)_minmax(100px,.65fr)_minmax(170px,1fr)_minmax(130px,.8fr)_minmax(120px,.8fr)_minmax(120px,.8fr)_minmax(130px,.8fr)_100px_100px_84px] items-center gap-4 border-b border-[#f0eef3] px-5 py-4 last:border-b-0">
-          <div className="flex min-w-0 items-center gap-3"><AdminCreatorPhoto creatorId={creator.creator_id} name={creator.display_name || creator.full_name} className="h-10 w-10 rounded-full"/><div className="min-w-0">{primaryProfileUrl(creator) ? <a href={primaryProfileUrl(creator)} target="_blank" rel="noopener noreferrer" className="block truncate text-sm font-semibold text-[#25262b] transition hover:text-[#6330dc] hover:underline">{creator.display_name || creator.full_name}</a> : <p className="truncate text-sm font-semibold text-[#25262b]">{creator.display_name || creator.full_name}</p>}<p className="truncate text-xs text-[#747b89]">{creatorTypeLabel(creator.creator_type)}{creator.username ? ` · @${creator.username}` : ''}</p></div></div>
+          <div className="flex min-w-0 items-center gap-3"><AdminCreatorPhoto creatorId={creator.creator_id} photoUrl={photoUrls[creator.creator_id] ?? null} name={creator.display_name || creator.full_name} className="h-10 w-10 rounded-full"/><div className="min-w-0">{primaryProfileUrl(creator) ? <a href={primaryProfileUrl(creator)} target="_blank" rel="noopener noreferrer" className="block truncate text-sm font-semibold text-[#25262b] transition hover:text-[#6330dc] hover:underline">{creator.display_name || creator.full_name}</a> : <p className="truncate text-sm font-semibold text-[#25262b]">{creator.display_name || creator.full_name}</p>}<p className="truncate text-xs text-[#747b89]">{creatorTypeLabel(creator.creator_type)}{creator.username ? ` · @${creator.username}` : ''}</p></div></div>
           <p className="break-words text-sm text-[#555b67]">{creator.phone_number || '—'}</p><p className="truncate text-sm text-[#555b67]">{creator.current_city || '—'}</p>
           <div className="space-y-1 text-xs leading-4 text-[#555b67]">{creator.platforms.length ? creator.platforms.map((item) => <p key={item.platform} className="flex items-baseline justify-between gap-2"><span>{platformLabel(item.platform)}</span><span className="whitespace-nowrap font-medium">{formatAudience(item.audience_count)} followers</span></p>) : '—'}</div>
           <p className="truncate text-sm font-medium text-[#555b67]">{formatViews(creator.last_30_days_views)}</p><p className="truncate text-sm text-[#555b67]">{displayNiche(creator)}</p><p className="truncate text-sm text-[#555b67]">{creatorTypeLabel(creator.creator_type)}</p>
           <div className="flex flex-wrap gap-1">{creator.platforms.map((item) => <span key={item.platform} className="rounded-md bg-[#f5f3f8] px-1.5 py-1 text-[0.65rem] font-bold text-[#5e6470]">{platformShortLabel(item.platform)}</span>)}</div>
-          <StatusBadge status={creator.status} /><p className="text-sm font-medium text-[#3d414a]">{creator.completed_sections} / {creator.total_required_sections}</p><Link href={`/admin/creators/${creator.creator_id}`} className="text-left text-sm font-semibold text-[#6330dc]">Review →</Link>
+          <StatusBadge status={creator.status} /><p className="text-sm font-medium text-[#3d414a]">{creator.completed_sections} / {creator.total_required_sections}</p><div className="flex flex-wrap gap-x-4 gap-y-2"><Link href={`/admin/creators/${creator.creator_id}`} className="text-left text-sm font-semibold text-[#6330dc]">Review →</Link><Link href={`/admin/creators/new?creator=${creator.creator_id}`} className="text-sm font-semibold text-[#6330dc]" aria-label={`Edit profile for ${creator.display_name || creator.full_name}`}>Edit Profile</Link></div>
         </div>)}
       </section>
 
@@ -449,7 +478,7 @@ export default function AdminCreatorsPage() {
           const profileUrl = primaryProfileUrl(creator);
           return <article key={creator.creator_id} className="rounded-2xl border border-[#e8e7eb] bg-white p-4 shadow-[0_8px_20px_rgba(33,24,54,0.03)]">
             <div className="flex items-start gap-3">
-              <AdminCreatorPhoto creatorId={creator.creator_id} name={creator.display_name || creator.full_name} className="h-11 w-11 rounded-full"/>
+              <AdminCreatorPhoto creatorId={creator.creator_id} photoUrl={photoUrls[creator.creator_id] ?? null} name={creator.display_name || creator.full_name} className="h-11 w-11 rounded-full"/>
               <div className="min-w-0 flex-1">
                 {profileUrl ? <a href={profileUrl} target="_blank" rel="noopener noreferrer" className="block truncate text-sm font-semibold text-[#25262b] hover:text-[#6330dc] hover:underline">{creator.display_name || creator.full_name}</a> : <p className="truncate text-sm font-semibold text-[#25262b]">{creator.display_name || creator.full_name}</p>}
                 <p className="mt-0.5 truncate text-xs text-[#747b89]">{creatorTypeLabel(creator.creator_type)}{creator.username ? ` · @${creator.username}` : ''}</p>
@@ -464,7 +493,7 @@ export default function AdminCreatorsPage() {
               <p><span className="block font-medium text-[#8a909b]">Last 30 Days Views</span><span className="mt-1 block font-medium text-[#4f5561]">{formatViews(creator.last_30_days_views)}</span></p>
               <div className="col-span-2"><span className="block font-medium text-[#8a909b]">Audience</span><div className="mt-1 space-y-1 text-[#4f5561]">{creator.platforms.length ? creator.platforms.map((item) => <p key={item.platform}>{platformLabel(item.platform)} <span className="font-medium">{formatAudience(item.audience_count)} followers</span></p>) : '—'}</div></div>
             </div>
-            <div className="mt-4 flex items-center justify-between border-t border-[#f0eef3] pt-3"><div className="flex gap-1">{creator.platforms.map((item) => <span key={item.platform} className="rounded-md bg-[#f5f3f8] px-1.5 py-1 text-[0.65rem] font-bold text-[#5e6470]">{platformShortLabel(item.platform)}</span>)}</div><Link href={`/admin/creators/${creator.creator_id}`} className="text-sm font-semibold text-[#6330dc]">Review →</Link></div>
+            <div className="mt-4 flex items-center justify-between border-t border-[#f0eef3] pt-3"><div className="flex gap-1">{creator.platforms.map((item) => <span key={item.platform} className="rounded-md bg-[#f5f3f8] px-1.5 py-1 text-[0.65rem] font-bold text-[#5e6470]">{platformShortLabel(item.platform)}</span>)}</div><div className="flex flex-wrap gap-x-4 gap-y-2"><Link href={`/admin/creators/${creator.creator_id}`} className="text-sm font-semibold text-[#6330dc]">Review →</Link><Link href={`/admin/creators/new?creator=${creator.creator_id}`} className="text-sm font-semibold text-[#6330dc]" aria-label={`Edit profile for ${creator.display_name || creator.full_name}`}>Edit Profile</Link></div></div>
           </article>;
         })}
       </section>

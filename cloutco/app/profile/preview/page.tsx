@@ -524,7 +524,7 @@ export function ProfileSummaryCard({
                   </div>
                 </div>
               </>
-            ) : (
+            ) : showOwnerActions ? (
               <div className="mt-7">
                 <EditorialPrompt
                   heading="Tell brands what you create"
@@ -533,7 +533,7 @@ export function ProfileSummaryCard({
                   action="Add Content & Niche"
                 />
               </div>
-            )}
+            ) : null}
           </div>
         </div>
       </div>
