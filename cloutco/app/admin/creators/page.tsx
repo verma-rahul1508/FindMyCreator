@@ -9,9 +9,9 @@ import { getSupabaseClient } from '@/lib/supabase/client';
 
 type StatusFilter = '' | 'pending' | 'active' | 'rejected';
 type SortOption = 'recent' | 'oldest' | 'name_asc' | 'name_desc' | 'followers_desc' | 'followers_asc' | 'completion_desc' | 'completion_asc';
-type FollowerRange = 'any' | '0-1k' | '1k-10k' | '10k-50k' | '50k-100k' | '100k-500k' | '500k-1m' | '1m-plus';
-type CompletionFilter = 'all' | '4' | '3' | '2' | '1' | '0';
-type JoinedFilter = 'any' | 'today' | '7-days' | '30-days' | '90-days';
+type FollowerRange = '0-1k' | '1k-10k' | '10k-50k' | '50k-100k' | '100k-500k' | '500k-1m' | '1m-plus';
+type CompletionFilter = '4' | '3' | '2' | '1' | '0';
+type JoinedFilter = 'today' | '7-days' | '30-days' | '90-days';
 
 const PAGE_SIZES = [25, 50, 100] as const;
 
@@ -37,6 +37,31 @@ const PLATFORM_OPTIONS = [
   { value: 'instagram', label: 'Instagram' },
   { value: 'facebook', label: 'Facebook' },
   { value: 'youtube', label: 'YouTube' },
+];
+
+const FOLLOWER_OPTIONS: Array<{ value: FollowerRange; label: string }> = [
+  { value: '0-1k', label: '0–1K' },
+  { value: '1k-10k', label: '1K–10K' },
+  { value: '10k-50k', label: '10K–50K' },
+  { value: '50k-100k', label: '50K–100K' },
+  { value: '100k-500k', label: '100K–500K' },
+  { value: '500k-1m', label: '500K–1M' },
+  { value: '1m-plus', label: '1M+' },
+];
+
+const COMPLETION_OPTIONS: Array<{ value: CompletionFilter; label: string }> = [
+  { value: '4', label: '4/4 complete' },
+  { value: '3', label: '3/4 complete' },
+  { value: '2', label: '2/4 complete' },
+  { value: '1', label: '1/4 complete' },
+  { value: '0', label: '0/4 complete' },
+];
+
+const JOINED_OPTIONS: Array<{ value: JoinedFilter; label: string }> = [
+  { value: 'today', label: 'Today' },
+  { value: '7-days', label: 'Last 7 days' },
+  { value: '30-days', label: 'Last 30 days' },
+  { value: '90-days', label: 'Last 90 days' },
 ];
 
 const SORT_OPTIONS: Array<{ value: SortOption; label: string }> = [
@@ -94,29 +119,6 @@ function displayNiche(creator: AdminCreatorListRow) {
   return creator.primary_niche === 'Other' && creator.primary_niche_other ? creator.primary_niche_other : creator.primary_niche || '—';
 }
 
-function followerBounds(range: FollowerRange): { min: number | null; max: number | null } {
-  switch (range) {
-    case '0-1k': return { min: 0, max: 1_000 };
-    case '1k-10k': return { min: 1_000, max: 10_000 };
-    case '10k-50k': return { min: 10_000, max: 50_000 };
-    case '50k-100k': return { min: 50_000, max: 100_000 };
-    case '100k-500k': return { min: 100_000, max: 500_000 };
-    case '500k-1m': return { min: 500_000, max: 1_000_000 };
-    case '1m-plus': return { min: 1_000_000, max: null };
-    default: return { min: null, max: null };
-  }
-}
-
-function joinedAfter(filter: JoinedFilter) {
-  if (filter === 'any') return null;
-  const date = new Date();
-  if (filter === 'today') date.setHours(0, 0, 0, 0);
-  if (filter === '7-days') date.setDate(date.getDate() - 7);
-  if (filter === '30-days') date.setDate(date.getDate() - 30);
-  if (filter === '90-days') date.setDate(date.getDate() - 90);
-  return date.toISOString();
-}
-
 function StatusBadge({ status }: { status: Exclude<StatusFilter, ''> }) {
   const meta = STATUS_META[status];
   return <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${meta.className}`}>{meta.label}</span>;
@@ -124,70 +126,44 @@ function StatusBadge({ status }: { status: Exclude<StatusFilter, ''> }) {
 
 type FilterControlsProps = {
   cities: string[];
-  status: StatusFilter;
-  city: string;
-  niche: string;
-  creatorType: string;
-  platform: string;
-  followers: FollowerRange;
-  completion: CompletionFilter;
-  joined: JoinedFilter;
-  onStatusChange: (value: StatusFilter) => void;
-  onCityChange: (value: string) => void;
-  onNicheChange: (value: string) => void;
-  onCreatorTypeChange: (value: string) => void;
-  onPlatformChange: (value: string) => void;
-  onFollowersChange: (value: FollowerRange) => void;
-  onCompletionChange: (value: CompletionFilter) => void;
-  onJoinedChange: (value: JoinedFilter) => void;
+  statuses: Exclude<StatusFilter, ''>[];
+  citiesSelected: string[];
+  niches: string[];
+  creatorTypes: string[];
+  platforms: string[];
+  followers: FollowerRange[];
+  completion: CompletionFilter[];
+  joined: JoinedFilter[];
+  onStatusesChange: (value: Exclude<StatusFilter, ''>[]) => void;
+  onCitiesChange: (value: string[]) => void;
+  onNichesChange: (value: string[]) => void;
+  onCreatorTypesChange: (value: string[]) => void;
+  onPlatformsChange: (value: string[]) => void;
+  onFollowersChange: (value: FollowerRange[]) => void;
+  onCompletionChange: (value: CompletionFilter[]) => void;
+  onJoinedChange: (value: JoinedFilter[]) => void;
 };
 
-function FilterControls(props: FilterControlsProps) {
-  const selectClassName = 'mt-1.5 min-h-11 w-full rounded-lg border border-[#e3e1e9] bg-white px-3 text-sm text-[#30333a] outline-none transition focus:border-[#9c7df0] focus:ring-2 focus:ring-[#ede7ff]';
+function toggleSelection<T extends string>(values: T[], value: T) {
+  return values.includes(value) ? values.filter((item) => item !== value) : [...values, value];
+}
 
+function MultiSelectFilter<T extends string>({ label, allLabel, options, selected, onChange }: { label: string; allLabel: string; options: Array<{ value: T; label: string }>; selected: T[]; onChange: (value: T[]) => void }) {
+  const selectedOptions = selected.filter((value) => !options.some((option) => option.value === value)).map((value) => ({ value, label: value }));
+  const availableOptions = [...options, ...selectedOptions];
+  return <div className="text-xs font-semibold text-[#575e6b]"><span>{label}</span><details className="group relative mt-1.5"><summary className="flex min-h-11 cursor-pointer list-none items-center justify-between rounded-lg border border-[#e3e1e9] bg-white px-3 text-sm font-normal text-[#30333a] outline-none transition hover:border-[#c9bee4] focus-visible:border-[#9c7df0] focus-visible:ring-2 focus-visible:ring-[#ede7ff]"><span className="truncate">{selected.length ? `${selected.length} selected` : allLabel}</span><svg viewBox="0 0 16 16" aria-hidden="true" className="ml-2 h-4 w-4 shrink-0 fill-none stroke-current stroke-[1.8] transition group-open:rotate-180"><path d="m4 6 4 4 4-4" /></svg></summary><div className="absolute z-30 mt-2 w-full min-w-52 overflow-hidden rounded-xl border border-[#e3e1e9] bg-white p-2 shadow-[0_12px_28px_rgba(33,24,54,0.14)]"><div className="mb-1 flex items-center justify-between px-2 py-1"><span className="text-xs font-semibold text-[#575e6b]">{selected.length} selected</span><button type="button" onClick={() => onChange([])} disabled={!selected.length} className="text-xs font-semibold text-[#6330dc] disabled:opacity-40">Clear</button></div><div className="max-h-52 overflow-y-auto">{availableOptions.map((option) => <label key={option.value} className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-2 text-sm font-normal text-[#30333a] hover:bg-[#f8f6fb]"><input type="checkbox" checked={selected.includes(option.value)} onChange={() => onChange(toggleSelection(selected, option.value))} className="h-4 w-4 rounded border-[#bfb8cf] text-[#6330dc] focus:ring-[#cfc0fb]" />{option.label}</label>)}</div></div></details></div>;
+}
+
+function FilterControls(props: FilterControlsProps) {
   return <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-    <label className="text-xs font-semibold text-[#575e6b]">Status
-      <select value={props.status} onChange={(event) => props.onStatusChange(event.target.value as StatusFilter)} className={selectClassName}>
-        <option value="">All</option><option value="pending">Pending</option><option value="active">Active</option><option value="rejected">Rejected</option>
-      </select>
-    </label>
-    <label className="text-xs font-semibold text-[#575e6b]">City
-      <select value={props.city} onChange={(event) => props.onCityChange(event.target.value)} className={selectClassName}>
-        <option value="">All cities</option>
-        {props.city && !props.cities.includes(props.city) && <option value={props.city}>{props.city}</option>}
-        {props.cities.map((city) => <option key={city} value={city}>{city}</option>)}
-      </select>
-    </label>
-    <label className="text-xs font-semibold text-[#575e6b]">Primary niche
-      <select value={props.niche} onChange={(event) => props.onNicheChange(event.target.value)} className={selectClassName}>
-        <option value="">All niches</option>{NICHE_OPTIONS.map((niche) => <option key={niche} value={niche}>{niche}</option>)}
-      </select>
-    </label>
-    <label className="text-xs font-semibold text-[#575e6b]">Creator type
-      <select value={props.creatorType} onChange={(event) => props.onCreatorTypeChange(event.target.value)} className={selectClassName}>
-        <option value="">All creator types</option>{CREATOR_TYPE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-      </select>
-    </label>
-    <label className="text-xs font-semibold text-[#575e6b]">Platform
-      <select value={props.platform} onChange={(event) => props.onPlatformChange(event.target.value)} className={selectClassName}>
-        <option value="">All platforms</option>{PLATFORM_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-      </select>
-    </label>
-    <label className="text-xs font-semibold text-[#575e6b]">Followers
-      <select value={props.followers} onChange={(event) => props.onFollowersChange(event.target.value as FollowerRange)} className={selectClassName}>
-        <option value="any">Any</option><option value="0-1k">0–1K</option><option value="1k-10k">1K–10K</option><option value="10k-50k">10K–50K</option><option value="50k-100k">50K–100K</option><option value="100k-500k">100K–500K</option><option value="500k-1m">500K–1M</option><option value="1m-plus">1M+</option>
-      </select>
-    </label>
-    <label className="text-xs font-semibold text-[#575e6b]">Profile completion
-      <select value={props.completion} onChange={(event) => props.onCompletionChange(event.target.value as CompletionFilter)} className={selectClassName}>
-        <option value="all">All</option><option value="4">4/4</option><option value="3">3/4</option><option value="2">2/4</option><option value="1">1/4</option><option value="0">0/4</option>
-      </select>
-    </label>
-    <label className="text-xs font-semibold text-[#575e6b]">Joined
-      <select value={props.joined} onChange={(event) => props.onJoinedChange(event.target.value as JoinedFilter)} className={selectClassName}>
-        <option value="any">Any time</option><option value="today">Today</option><option value="7-days">Last 7 days</option><option value="30-days">Last 30 days</option><option value="90-days">Last 90 days</option>
-      </select>
-    </label>
+    <MultiSelectFilter label="Status" allLabel="All statuses" options={[{ value: 'pending', label: 'Pending' }, { value: 'active', label: 'Active' }, { value: 'rejected', label: 'Rejected' }]} selected={props.statuses} onChange={props.onStatusesChange} />
+    <MultiSelectFilter label="City" allLabel="All cities" options={props.cities.map((city) => ({ value: city, label: city }))} selected={props.citiesSelected} onChange={props.onCitiesChange} />
+    <MultiSelectFilter label="Primary niche" allLabel="All niches" options={NICHE_OPTIONS.map((niche) => ({ value: niche, label: niche }))} selected={props.niches} onChange={props.onNichesChange} />
+    <MultiSelectFilter label="Creator type" allLabel="All creator types" options={CREATOR_TYPE_OPTIONS} selected={props.creatorTypes} onChange={props.onCreatorTypesChange} />
+    <MultiSelectFilter label="Platform" allLabel="All platforms" options={PLATFORM_OPTIONS} selected={props.platforms} onChange={props.onPlatformsChange} />
+    <MultiSelectFilter label="Followers" allLabel="Any follower count" options={FOLLOWER_OPTIONS} selected={props.followers} onChange={props.onFollowersChange} />
+    <MultiSelectFilter label="Profile completion" allLabel="All completion levels" options={COMPLETION_OPTIONS} selected={props.completion} onChange={props.onCompletionChange} />
+    <MultiSelectFilter label="Joined" allLabel="Any time" options={JOINED_OPTIONS} selected={props.joined} onChange={props.onJoinedChange} />
   </div>;
 }
 
@@ -201,21 +177,20 @@ export default function AdminCreatorsPage() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const requestedStatus = searchParams.get('status');
-  const status: StatusFilter = requestedStatus === 'pending' || requestedStatus === 'active' || requestedStatus === 'rejected' ? requestedStatus : '';
+  const statuses = useMemo(() => [...new Set((searchParams.get('status') || '').split(',').filter((value): value is Exclude<StatusFilter, ''> => value === 'pending' || value === 'active' || value === 'rejected'))], [searchParams]);
   const [rows, setRows] = useState<AdminCreatorListRow[]>([]);
   const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
   const [counts, setCounts] = useState<AdminCreatorStatusCounts | null>(null);
   const [filterCities, setFilterCities] = useState<string[]>([]);
   const [searchValue, setSearchValue] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [city, setCity] = useState('');
-  const [niche, setNiche] = useState('');
-  const [creatorType, setCreatorType] = useState('');
-  const [platform, setPlatform] = useState('');
-  const [followers, setFollowers] = useState<FollowerRange>('any');
-  const [completion, setCompletion] = useState<CompletionFilter>('all');
-  const [joined, setJoined] = useState<JoinedFilter>('any');
+  const [citiesSelected, setCitiesSelected] = useState<string[]>([]);
+  const [niches, setNiches] = useState<string[]>([]);
+  const [creatorTypes, setCreatorTypes] = useState<string[]>([]);
+  const [platforms, setPlatforms] = useState<string[]>([]);
+  const [followers, setFollowers] = useState<FollowerRange[]>([]);
+  const [completion, setCompletion] = useState<CompletionFilter[]>([]);
+  const [joined, setJoined] = useState<JoinedFilter[]>([]);
   const [sort, setSort] = useState<SortOption>('recent');
   const [sortTouched, setSortTouched] = useState(false);
   const [pageSize, setPageSize] = useState<(typeof PAGE_SIZES)[number]>(25);
@@ -226,13 +201,11 @@ export default function AdminCreatorsPage() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
-  const effectiveSort: SortOption = status === 'pending' && !sortTouched ? 'oldest' : sort;
-  const bounds = useMemo(() => followerBounds(followers), [followers]);
-  const joinedAfterValue = useMemo(() => joinedAfter(joined), [joined]);
-  const availableCities = useMemo(() => filterCities.length ? filterCities : [...new Set(rows.map((creator) => creator.current_city.trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b)), [filterCities, rows]);
+  const effectiveSort: SortOption = statuses.length === 1 && statuses[0] === 'pending' && !sortTouched ? 'oldest' : sort;
+  const availableCities = useMemo(() => filterCities.length ? filterCities : [...new Set(rows.map((creator) => creator.current_city?.trim() || '').filter(Boolean))].sort((a, b) => a.localeCompare(b)), [filterCities, rows]);
   const totalCount = numericValue(rows[0]?.total_count);
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
-  const hasActiveFilters = Boolean(searchValue.trim() || status || city || niche || creatorType || platform || followers !== 'any' || completion !== 'all' || joined !== 'any');
+  const hasActiveFilters = Boolean(searchValue.trim() || statuses.length || citiesSelected.length || niches.length || creatorTypes.length || platforms.length || followers.length || completion.length || joined.length);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedSearch(searchValue.trim()), 350);
@@ -288,19 +261,16 @@ export default function AdminCreatorsPage() {
         return;
       }
 
-      const { data, error } = await supabase.rpc('admin_list_creators_with_contact', {
+      const { data, error } = await supabase.rpc('admin_list_creators_with_contact_multi', {
         p_search: debouncedSearch || null,
-        p_status: status || null,
-        p_city: city || null,
-        p_primary_niche: niche || null,
-        p_creator_type: creatorType || null,
-        p_platform: platform || null,
-        p_min_followers: bounds.min,
-        p_max_followers: bounds.max,
-        p_min_completion: completion === 'all' ? null : Number(completion),
-        p_max_completion: completion === 'all' ? null : Number(completion),
-        p_joined_after: joinedAfterValue,
-        p_joined_before: null,
+        p_statuses: statuses,
+        p_cities: citiesSelected,
+        p_primary_niches: niches,
+        p_creator_types: creatorTypes,
+        p_platforms: platforms,
+        p_follower_ranges: followers,
+        p_completion_values: completion.map(Number),
+        p_joined_periods: joined,
         p_sort: effectiveSort,
         p_limit: pageSize,
         p_offset: (page - 1) * pageSize,
@@ -327,7 +297,7 @@ export default function AdminCreatorsPage() {
 
     void loadCreators();
     return () => { active = false; };
-  }, [bounds.max, bounds.min, city, completion, creatorType, debouncedSearch, effectiveSort, joinedAfterValue, niche, page, pageSize, platform, refreshKey, status]);
+  }, [citiesSelected, completion, creatorTypes, debouncedSearch, effectiveSort, followers, joined, niches, page, pageSize, platforms, refreshKey, statuses]);
 
   useEffect(() => {
     if (loading) return;
@@ -356,10 +326,14 @@ export default function AdminCreatorsPage() {
     return () => { active = false; controller.abort(); };
   }, [rows, loading]);
 
-  const updateStatus = useCallback((nextStatus: StatusFilter) => {
+  const updateStatuses = useCallback((nextStatuses: Exclude<StatusFilter, ''>[]) => {
     setPage(1);
-    router.replace(nextStatus ? `${pathname}?status=${nextStatus}` : pathname);
+    router.replace(nextStatuses.length ? `${pathname}?status=${nextStatuses.join(',')}` : pathname);
   }, [pathname, router]);
+
+  const updateStatus = useCallback((nextStatus: StatusFilter) => {
+    updateStatuses(nextStatus ? toggleSelection(statuses, nextStatus) : []);
+  }, [statuses, updateStatuses]);
 
   const resetPage = <T,>(setter: (value: T) => void, value: T) => {
     setter(value);
@@ -369,13 +343,13 @@ export default function AdminCreatorsPage() {
   const clearAll = () => {
     setSearchValue('');
     setDebouncedSearch('');
-    setCity('');
-    setNiche('');
-    setCreatorType('');
-    setPlatform('');
-    setFollowers('any');
-    setCompletion('all');
-    setJoined('any');
+    setCitiesSelected([]);
+    setNiches([]);
+    setCreatorTypes([]);
+    setPlatforms([]);
+    setFollowers([]);
+    setCompletion([]);
+    setJoined([]);
     setSort('recent');
     setSortTouched(false);
     setPage(1);
@@ -384,19 +358,19 @@ export default function AdminCreatorsPage() {
 
   const filterProps: FilterControlsProps = {
     cities: availableCities,
-    status,
-    city,
-    niche,
-    creatorType,
-    platform,
+    statuses,
+    citiesSelected,
+    niches,
+    creatorTypes,
+    platforms,
     followers,
     completion,
     joined,
-    onStatusChange: updateStatus,
-    onCityChange: (value) => resetPage(setCity, value),
-    onNicheChange: (value) => resetPage(setNiche, value),
-    onCreatorTypeChange: (value) => resetPage(setCreatorType, value),
-    onPlatformChange: (value) => resetPage(setPlatform, value),
+    onStatusesChange: updateStatuses,
+    onCitiesChange: (value) => resetPage(setCitiesSelected, value),
+    onNichesChange: (value) => resetPage(setNiches, value),
+    onCreatorTypesChange: (value) => resetPage(setCreatorTypes, value),
+    onPlatformsChange: (value) => resetPage(setPlatforms, value),
     onFollowersChange: (value) => resetPage(setFollowers, value),
     onCompletionChange: (value) => resetPage(setCompletion, value),
     onJoinedChange: (value) => resetPage(setJoined, value),
@@ -416,7 +390,7 @@ export default function AdminCreatorsPage() {
 
     <div className="mt-8 grid grid-cols-2 gap-3 lg:grid-cols-4">
       {statusCards.map((card) => {
-        const selected = status === card.key;
+        const selected = card.key ? statuses.includes(card.key) : !statuses.length;
         return <button key={card.label} type="button" onClick={() => updateStatus(card.key)} className={`rounded-2xl border px-4 py-4 text-left transition ${selected ? 'border-[#9b7bed] bg-[#f5f1ff] shadow-[0_8px_20px_rgba(92,55,184,0.08)]' : 'border-[#e8e7eb] bg-white hover:border-[#cec6df]'}`}>
           <span className="text-sm font-medium text-[#626a7a]">{card.label}</span>
           <span className="mt-2 block text-2xl font-semibold tracking-[-0.05em] text-[#1c1d21]">{counts ? new Intl.NumberFormat('en-US').format(card.count) : '—'}</span>
@@ -445,15 +419,15 @@ export default function AdminCreatorsPage() {
       <div className="mt-5 hidden border-t border-[#efedf2] pt-5 md:block"><FilterControls {...filterProps} /></div>
 
       {hasActiveFilters && <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-[#efedf2] pt-4">
-        {status && <span className="rounded-full bg-[#f1ebff] px-3 py-1 text-xs font-semibold text-[#6330dc]">{STATUS_META[status].label}</span>}
+        {statuses.map((value) => <span key={value} className="rounded-full bg-[#f1ebff] px-3 py-1 text-xs font-semibold text-[#6330dc]">{STATUS_META[value].label}</span>)}
         {searchValue.trim() && <span className="rounded-full bg-[#f7f5fa] px-3 py-1 text-xs text-[#575e6b]">Search: {searchValue.trim()}</span>}
-        {city && <span className="rounded-full bg-[#f7f5fa] px-3 py-1 text-xs text-[#575e6b]">{city}</span>}
-        {niche && <span className="rounded-full bg-[#f7f5fa] px-3 py-1 text-xs text-[#575e6b]">{niche}</span>}
-        {creatorType && <span className="rounded-full bg-[#f7f5fa] px-3 py-1 text-xs text-[#575e6b]">{creatorTypeLabel(creatorType)}</span>}
-        {platform && <span className="rounded-full bg-[#f7f5fa] px-3 py-1 text-xs text-[#575e6b]">{PLATFORM_OPTIONS.find((option) => option.value === platform)?.label}</span>}
-        {followers !== 'any' && <span className="rounded-full bg-[#f7f5fa] px-3 py-1 text-xs text-[#575e6b]">Followers: {followers.replace('-', '–').replace('k', 'K').replace('m', 'M')}</span>}
-        {completion !== 'all' && <span className="rounded-full bg-[#f7f5fa] px-3 py-1 text-xs text-[#575e6b]">{completion}/4 complete</span>}
-        {joined !== 'any' && <span className="rounded-full bg-[#f7f5fa] px-3 py-1 text-xs text-[#575e6b]">{joined === 'today' ? 'Today' : `Last ${joined.replace('-days', '')} days`}</span>}
+        {citiesSelected.map((value) => <span key={value} className="rounded-full bg-[#f7f5fa] px-3 py-1 text-xs text-[#575e6b]">{value}</span>)}
+        {niches.map((value) => <span key={value} className="rounded-full bg-[#f7f5fa] px-3 py-1 text-xs text-[#575e6b]">{value}</span>)}
+        {creatorTypes.map((value) => <span key={value} className="rounded-full bg-[#f7f5fa] px-3 py-1 text-xs text-[#575e6b]">{creatorTypeLabel(value)}</span>)}
+        {platforms.map((value) => <span key={value} className="rounded-full bg-[#f7f5fa] px-3 py-1 text-xs text-[#575e6b]">{PLATFORM_OPTIONS.find((option) => option.value === value)?.label || value}</span>)}
+        {followers.map((value) => <span key={value} className="rounded-full bg-[#f7f5fa] px-3 py-1 text-xs text-[#575e6b]">Followers: {FOLLOWER_OPTIONS.find((option) => option.value === value)?.label}</span>)}
+        {completion.map((value) => <span key={value} className="rounded-full bg-[#f7f5fa] px-3 py-1 text-xs text-[#575e6b]">{value}/4 complete</span>)}
+        {joined.map((value) => <span key={value} className="rounded-full bg-[#f7f5fa] px-3 py-1 text-xs text-[#575e6b]">{JOINED_OPTIONS.find((option) => option.value === value)?.label}</span>)}
         <button type="button" onClick={clearAll} className="ml-1 text-xs font-semibold text-[#6330dc] hover:text-[#4f24bc]">Clear all</button>
       </div>}
     </section>

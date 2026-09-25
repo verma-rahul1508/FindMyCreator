@@ -12,7 +12,7 @@ export type AdminCreatorListRow = {
   username: string | null;
   full_name: string;
   phone_number: string | null;
-  current_city: string;
+  current_city: string | null;
   primary_niche: string | null;
   primary_niche_other: string | null;
   creator_type: string | null;
