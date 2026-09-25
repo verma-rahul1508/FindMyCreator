@@ -1,5 +1,5 @@
 export type BrandStatus = 'draft' | 'active' | 'completed' | 'archived';
-export type BrandServiceType = 'creator_collaboration' | 'shoot' | 'editing' | 'meta_ads' | 'google_ads';
+export type BrandServiceType = 'creator_collaboration' | 'shoot' | 'editing' | 'meta_ads' | 'google_ads' | 'street_marketing';
 
 export type BrandListRow = {
   brand_id: string;
@@ -89,6 +89,7 @@ export const SERVICE_LABELS: Record<BrandServiceType, string> = {
   editing: 'Editing',
   meta_ads: 'Meta Ads',
   google_ads: 'Google Ads',
+  street_marketing: 'Street Marketing',
 };
 
 export function createEmptyService(serviceType: BrandServiceType, serviceOrder: number): BrandService {
@@ -125,7 +126,7 @@ function editorStatus(value: unknown): BrandStatus {
 }
 
 function editorServiceType(value: unknown): BrandServiceType {
-  return value === 'shoot' || value === 'editing' || value === 'meta_ads' || value === 'google_ads' || value === 'creator_collaboration' ? value : 'creator_collaboration';
+  return value === 'shoot' || value === 'editing' || value === 'meta_ads' || value === 'google_ads' || value === 'street_marketing' || value === 'creator_collaboration' ? value : 'creator_collaboration';
 }
 
 function editorPlatform(value: unknown): BrandService['platform'] {

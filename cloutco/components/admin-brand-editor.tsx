@@ -155,6 +155,15 @@ function ServiceFields({ service, update }: { service: BrandService; update: (pa
     {finalPrice}<DetailTextArea label="Reference / Notes" value={service.referenceNotes} onChange={(value) => update({ referenceNotes: value })} />
   </div>;
 
+  if (service.serviceType === 'street_marketing') return <div className="grid gap-4 sm:grid-cols-2">
+    <DetailInput label="Campaign Objective" value={service.campaignObjective} onChange={(value) => update({ campaignObjective: value })} placeholder="Awareness, footfall, launches…" />
+    <DetailInput label="Deliverables" value={service.deliverables} onChange={(value) => update({ deliverables: value })} placeholder="Boards, mall activations…" />
+    <DetailInput label="Activation Area" value={service.location} onChange={(value) => update({ location: value })} placeholder="PAN-India or selected markets" />
+    <DetailInput label="Duration / Days" type="number" value={service.durationHours} onChange={(value) => update({ durationHours: value })} placeholder="Optional" />
+    {finalPrice}
+    <DetailTextArea label="Campaign Notes" value={service.productionNotes} onChange={(value) => update({ productionNotes: value })} placeholder="Placement approach, rollout or other proposal-ready details" />
+  </div>;
+
   return <div className="grid gap-4 sm:grid-cols-2">
     <DetailInput label="Campaign Objective" value={service.campaignObjective} onChange={(value) => update({ campaignObjective: value })} placeholder="Awareness, leads…" />
     <DetailInput label="Daily Ad Budget" required type="number" value={service.dailyAdBudget} onChange={(value) => setAdBudget('dailyAdBudget', value)} placeholder="0" />
@@ -177,7 +186,7 @@ export function AdminBrandEditor({ initialDetail }: { initialDetail?: BrandDetai
   const router = useRouter();
   const [brand, setBrand] = useState<BrandFormData>(() => initialDetail ? normalizeBrandForEditor(initialDetail).brand : createEmptyBrand());
   const [services, setServices] = useState<BrandService[]>(() => initialDetail ? normalizeBrandForEditor(initialDetail).services : []);
-  const [saving, setSaving] = useState<'draft' | 'continue' | null>(null);
+  const [saving, setSaving] = useState<'draft' | 'continue' | 'proposal' | null>(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
@@ -209,23 +218,24 @@ export function AdminBrandEditor({ initialDetail }: { initialDetail?: BrandDetai
     return '';
   };
 
-  const save = async (submit: boolean) => {
+  const save = async (submit: boolean, destination?: 'proposal') => {
     const validationMessage = validate(submit);
     if (validationMessage) { setError(validationMessage); return; }
     const supabase = getSupabaseClient();
     if (!supabase) { setError('Admin connection is unavailable. Please try again.'); return; }
-    setError(''); setSuccess(''); setSaving(submit ? 'continue' : 'draft');
+    setError(''); setSuccess(''); setSaving(destination === 'proposal' ? 'proposal' : submit ? 'continue' : 'draft');
     const payload = createBrandSavePayload(brand, services);
     const { data, error: rpcError } = await supabase.rpc('admin_save_brand', { p_brand: payload.brand, p_services: payload.services, p_submit: submit });
     setSaving(null);
     if (rpcError || typeof data !== 'string') { setError('We could not save this brand. Check the details and try again.'); return; }
     setBrand((current) => ({ ...current, id: data }));
     if (submit) router.push(`/admin/brands/${data}`);
+    else if (destination === 'proposal') router.push(`/admin/brands/${data}/proposal`);
     else { setSuccess('Draft saved.'); router.replace(`/admin/brands/${data}`); }
   };
 
   return <section className="mx-auto w-full max-w-6xl px-5 py-9 sm:px-8 sm:py-12 lg:px-10">
-    <header className="flex flex-col gap-5 border-b border-[#e8e7eb] pb-7 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-xs font-bold uppercase tracking-[0.18em] text-[#7C3AED]">Brand onboarding</p><h1 className="mt-3 text-[2.15rem] font-semibold tracking-[-0.06em] text-[#151518] sm:text-[2.7rem]">{brand.id ? 'Brand Details' : 'Add Brand'}</h1><p className="mt-3 max-w-2xl text-sm leading-6 text-[#626a7a]">Create a brand record, configure each service independently, and review the live final price.</p></div><div className="rounded-xl border border-[#e7e1f1] bg-[#faf8ff] px-4 py-3"><p className="text-xs font-bold uppercase tracking-[0.12em] text-[#7657ca]">Final Price for Brand</p><p className="mt-1 text-2xl font-semibold tracking-[-0.05em] text-[#26222d]">{formatCurrency(finalPrice)}</p></div></header>
+    <header className="flex flex-col gap-5 border-b border-[#e8e7eb] pb-7 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-xs font-bold uppercase tracking-[0.18em] text-[#7C3AED]">Brand onboarding</p><h1 className="mt-3 text-[2.15rem] font-semibold tracking-[-0.06em] text-[#151518] sm:text-[2.7rem]">{brand.id ? 'Brand Details' : 'Add Brand'}</h1><p className="mt-3 max-w-2xl text-sm leading-6 text-[#626a7a]">Create a brand record, configure each service independently, and review the live final price.</p></div><div className="flex flex-wrap items-center gap-3"><button type="button" disabled={saving !== null} onClick={() => void save(false, 'proposal')} className="min-h-11 rounded-lg border border-[#d7caef] bg-[#faf8ff] px-4 text-sm font-semibold text-[#6330dc] disabled:cursor-not-allowed disabled:opacity-60">{saving === 'proposal' ? 'Preparing…' : 'Prepare proposal'}</button><div className="rounded-xl border border-[#e7e1f1] bg-[#faf8ff] px-4 py-3"><p className="text-xs font-bold uppercase tracking-[0.12em] text-[#7657ca]">Final Price for Brand</p><p className="mt-1 text-2xl font-semibold tracking-[-0.05em] text-[#26222d]">{formatCurrency(finalPrice)}</p></div></div></header>
     {error && <p role="alert" className="mt-5 rounded-xl border border-[#f1d4d7] bg-[#fff8f8] px-4 py-3 text-sm text-[#99404b]">{error}</p>}{success && <p className="mt-5 rounded-xl border border-[#cae8d7] bg-[#f4fbf7] px-4 py-3 text-sm text-[#28734b]">{success}</p>}
     <section className="mt-7 rounded-2xl border border-[#e8e7eb] bg-white p-5 shadow-[0_8px_22px_rgba(33,24,54,0.03)] sm:p-6"><div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-xs font-bold uppercase tracking-[0.14em] text-[#7c3aed]">Section 1</p><h2 className="mt-1 text-xl font-semibold tracking-[-0.04em] text-[#25262b]">Brand Details</h2></div><label className="text-xs font-semibold text-[#575e6b]">Status<select value={brand.status} onChange={(event) => patchBrand('status', event.target.value)} className={`${INPUT_CLASS} mt-0`}><option value="draft">Draft</option><option value="active">Active</option><option value="completed">Completed</option><option value="archived">Archived</option></select></label></div>
       <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3"><DetailInput label="Brand / Business Name" required value={brand.brandName} onChange={(value) => patchBrand('brandName', value)} /><DetailInput label="Contact Person" required value={brand.contactPerson} onChange={(value) => patchBrand('contactPerson', value)} /><DetailInput label="Phone Number" required value={brand.phoneNumber} onChange={(value) => patchBrand('phoneNumber', value)} type="tel" /><DetailInput label="Email" required value={brand.email} onChange={(value) => patchBrand('email', value)} type="email" /><DetailInput label="City" required value={brand.city} onChange={(value) => patchBrand('city', value)} /><DetailInput label="Business Category" required value={brand.businessCategory} onChange={(value) => patchBrand('businessCategory', value)} /><DetailInput label="Website" value={brand.website} onChange={(value) => patchBrand('website', value)} placeholder="https://" /><DetailInput label="Instagram" value={brand.instagram} onChange={(value) => patchBrand('instagram', value)} placeholder="@brand" /><DetailInput label="GSTIN" value={brand.gstin} onChange={(value) => patchBrand('gstin', value)} /><div className="sm:col-span-2"><DetailTextArea label="Business Address" value={brand.businessAddress} onChange={(value) => patchBrand('businessAddress', value)} /></div><div className="sm:col-span-2 lg:col-span-1"><DetailTextArea label="Internal Notes" value={brand.internalNotes} onChange={(value) => patchBrand('internalNotes', value)} /></div></div>
