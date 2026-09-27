@@ -23,21 +23,24 @@ export function ProposalStrategy({ brandName, content }: { brandName: string; co
 
   return <section className="border-t border-[#e8dfd6] py-10 sm:py-12">
     <div className="overflow-hidden bg-[#21142b] px-6 py-8 text-white sm:px-9 sm:py-10">
-      <p className="text-[0.68rem] font-bold uppercase tracking-[0.2em] text-[#cbb4ff]">The CloutCo view</p>
+      <p className="text-[0.68rem] font-bold uppercase tracking-[0.2em] text-[#cbb4ff]">Why this campaign works</p>
       <h2 className="mt-4 max-w-3xl text-3xl font-semibold leading-tight tracking-[-0.055em] sm:text-4xl">{content.viewHeadline}</h2>
       <p className="mt-5 max-w-3xl text-base leading-7 text-white/85 sm:text-lg sm:leading-8">{content.viewBody}</p>
-      <div className="mt-7 border-t border-white/20 pt-5 text-sm font-medium leading-6 text-[#e2d5ff]">Positioning goal · {content.positioningGoal}</div>
+      <div className="mt-8 border-l-4 border-[#c6adff] bg-white/10 px-5 py-5 sm:px-6">
+        <p className="text-[0.68rem] font-bold uppercase tracking-[0.18em] text-[#d9c6ff]">How we position {brandName}</p>
+        <p className="mt-2 max-w-4xl text-lg font-semibold leading-7 tracking-[-0.02em] text-white sm:text-xl sm:leading-8">{content.positioningGoal}</p>
+      </div>
     </div>
 
     <p className="mt-12 text-[0.68rem] font-bold uppercase tracking-[0.17em] text-[#6330dc]">The opportunity</p>
-    <h2 className="mt-2 text-3xl font-semibold tracking-[-0.055em]">{content.opportunityHeadline}</h2>
+    <h2 className="mt-2 text-3xl font-semibold tracking-[-0.055em] sm:text-4xl">{content.opportunityHeadline}</h2>
     <div className="mt-6 border border-[#e4dcd4] bg-[#fffaf3] p-5 sm:p-7"><p className="max-w-4xl text-base leading-8 text-[#514b56] sm:text-lg">{content.opportunityBody}</p></div>
-    <div className="mt-4 grid gap-4 md:grid-cols-3">{content.storyCards.map(({ title, description }) => <div key={title} className="border border-[#e4dcd4] bg-white p-5 sm:p-6"><h3 className="text-lg font-semibold tracking-[-0.035em]">{title}</h3><p className="mt-3 text-sm leading-6 text-[#69636c]">{description}</p></div>)}</div>
+    <div className="mt-4 grid gap-4 md:grid-cols-3">{content.storyCards.map(({ title, description }) => <div key={title} className="border border-[#e4dcd4] bg-white p-5 sm:p-6"><h3 className="text-xl font-semibold tracking-[-0.04em] sm:text-2xl">{title}</h3><p className="mt-3 text-sm leading-6 text-[#69636c] sm:text-base sm:leading-7">{description}</p></div>)}</div>
 
     <div className="mt-12 border-t border-[#e8dfd6] pt-10">
       <p className="text-[0.68rem] font-bold uppercase tracking-[0.17em] text-[#6330dc]">Showcase proposal · Instagram</p>
-      <h3 className="mt-2 text-2xl font-semibold tracking-[-0.045em] sm:text-3xl">{content.showcaseTitle}</h3>
-      <p className="mt-4 max-w-3xl text-base leading-7 text-[#625d66]">{content.showcaseBody}</p>
+      <h3 className="mt-2 text-3xl font-semibold tracking-[-0.055em] sm:text-4xl">{content.showcaseTitle}</h3>
+      <p className="mt-4 max-w-3xl text-base leading-7 text-[#625d66] sm:text-lg sm:leading-8">{content.showcaseBody}</p>
       <div className="mt-7 grid gap-7 lg:grid-cols-[minmax(0,1fr)_260px] lg:items-start">
         <div className="bg-white p-1.5 shadow-[0_12px_35px_rgba(66,45,29,0.08)] sm:p-2">
           {content.showcaseImageUrl ? <img src={content.showcaseImageUrl} alt={`Illustrative nine-tile Instagram feed for ${brandName}`} className="block h-auto w-full" /> : <div className="grid grid-cols-3 gap-1.5">{previewLabels.map((label, index) => <div key={`${index}-${label}`} className={`flex aspect-square items-end p-2 text-xs font-semibold leading-tight ${TILE_COLORS[index]} ${index === 4 || index === 8 ? 'text-white' : 'text-[#2c202c]'} sm:p-4 sm:text-base`}>{label}</div>)}</div>}
