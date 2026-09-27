@@ -11,7 +11,7 @@ function unauthorizedResponse() {
   );
 }
 
-function authorizationResponse(status: 401 | 403, error: string) {
+function authorizationResponse(status: 401 | 403 | 503, error: string) {
   return NextResponse.json(
     { error },
     { status, headers: { 'Cache-Control': 'no-store' } },
@@ -30,6 +30,10 @@ export async function POST(request: Request) {
 
   if (authorizationResult.state === 'unauthenticated') {
     return unauthorizedResponse();
+  }
+
+  if (authorizationResult.state === 'unavailable') {
+    return authorizationResponse(503, 'Admin verification is temporarily unavailable.');
   }
 
   if (authorizationResult.state === 'forbidden') {

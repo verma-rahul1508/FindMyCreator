@@ -6,7 +6,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { AuthAwareLogo } from '@/components/auth-aware-logo';
 import { getSupabaseClient } from '@/lib/supabase/client';
 
-type AccessState = 'checking' | 'forbidden';
+type AccessState = 'checking' | 'forbidden' | 'unavailable';
 
 function DashboardIcon() {
   return <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5 fill-none stroke-current stroke-[1.7]"><rect x="4" y="4" width="6.5" height="6.5" rx="1" /><rect x="13.5" y="4" width="6.5" height="6.5" rx="1" /><rect x="4" y="13.5" width="6.5" height="6.5" rx="1" /><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1" /></svg>;
@@ -128,36 +128,52 @@ export function AdminSessionBootstrap() {
 
     const verifyAccess = async () => {
       const supabase = getSupabaseClient();
-      const { data: sessionData } = supabase ? await supabase.auth.getSession() : { data: { session: null } };
-      const accessToken = sessionData.session?.access_token;
+      if (!supabase) {
+        if (active) setAccessState('forbidden');
+        return;
+      }
 
-      if (!accessToken) {
+      const { data: currentUser, error: userError } = await supabase.auth.getUser();
+      if (userError || !currentUser.user) {
         router.replace('/signin');
         return;
       }
 
       try {
-        const response = await fetch('/api/admin/session', {
+        const establishAdminSession = (accessToken: string) => fetch('/api/admin/session', {
           method: 'POST',
           headers: { Authorization: `Bearer ${accessToken}` },
           cache: 'no-store',
         });
 
+        const { data: sessionData } = await supabase.auth.getSession();
+        if (!sessionData.session) {
+          if (active) setAccessState('unavailable');
+          return;
+        }
+        let response = await establishAdminSession(sessionData.session.access_token);
+        if (response.status === 401) {
+          const { data: refreshedData, error: refreshError } = await supabase.auth.refreshSession();
+          if (!refreshError && refreshedData.session) {
+            response = await establishAdminSession(refreshedData.session.access_token);
+          }
+        }
+
         if (!active) return;
 
         if (response.status === 401) {
-          router.replace('/signin');
+          setAccessState('unavailable');
           return;
         }
 
         if (!response.ok) {
-          setAccessState('forbidden');
+          setAccessState(response.status === 403 ? 'forbidden' : 'unavailable');
           return;
         }
 
         window.location.reload();
       } catch {
-        if (active) setAccessState('forbidden');
+        if (active) setAccessState('unavailable');
       }
     };
 
@@ -172,6 +188,10 @@ export function AdminSessionBootstrap() {
 
   if (accessState === 'forbidden') {
     return <main className="grid min-h-screen place-items-center bg-[#fffdfc] px-6 text-center"><section className="max-w-md rounded-2xl border border-[#e8e7eb] bg-white p-8 shadow-[0_12px_35px_rgba(33,24,54,0.06)]"><p className="text-xs font-bold uppercase tracking-[0.18em] text-[#7C3AED]">Access restricted</p><h1 className="mt-4 text-2xl font-semibold tracking-[-0.05em] text-[#151518]">Administrator access is required.</h1><p className="mt-3 text-sm leading-6 text-[#697080]">This account is not authorized to view the CloutCo admin workspace.</p><Link href="/dashboard" className="mt-7 inline-flex min-h-11 items-center justify-center rounded-lg bg-[#151518] px-5 text-sm font-medium text-white transition hover:bg-[#2a2b2f]">Return to Dashboard</Link></section></main>;
+  }
+
+  if (accessState === 'unavailable') {
+    return <main className="grid min-h-screen place-items-center bg-[#fffdfc] px-6 text-center"><section className="max-w-md rounded-2xl border border-[#e8e7eb] bg-white p-8"><h1 className="text-2xl font-semibold tracking-[-0.05em] text-[#151518]">We could not verify Admin access.</h1><p className="mt-3 text-sm leading-6 text-[#697080]">Your account remains signed in. Return to Dashboard and try opening Admin again.</p><Link href="/dashboard" className="mt-7 inline-flex min-h-11 items-center justify-center rounded-lg bg-[#151518] px-5 text-sm font-medium text-white">Return to Dashboard</Link></section></main>;
   }
 
   return null;

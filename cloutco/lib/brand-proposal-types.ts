@@ -27,6 +27,7 @@ export type BrandProposal = {
   planLevel: string;
   startingInvestment: number | string;
   totalInvestment: number | string;
+  proposalContent: unknown;
   creators: BrandProposalCreator[];
   additionalServices: BrandProposalAdditionalService[];
 };
@@ -95,8 +96,9 @@ export function normalizeBrandProposal(value: unknown): BrandProposal | null {
     brandName: text(source.brandName),
     businessCategory: text(source.businessCategory),
     planLevel: text(source.planLevel) ?? 'Premium Service',
-    startingInvestment: numeric(source.startingInvestment) ?? 25000,
+    startingInvestment: numeric(source.startingInvestment) ?? 0,
     totalInvestment: numeric(source.totalInvestment) ?? 0,
+    proposalContent: source.proposalContent ?? null,
     creators: Array.isArray(source.creators) ? source.creators.map(creator).filter((item): item is BrandProposalCreator => item !== null) : [],
     additionalServices: Array.isArray(source.additionalServices) ? source.additionalServices.map(additionalService).filter((item): item is BrandProposalAdditionalService => item !== null) : [],
   };

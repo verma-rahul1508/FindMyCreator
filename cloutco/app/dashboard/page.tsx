@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type MouseEvent } from "react";
 import { useRouter } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
 import { AuthAwareLogo } from "@/components/auth-aware-logo";
@@ -124,8 +124,54 @@ export default function DashboardPage() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
+  const [openingAdmin, setOpeningAdmin] = useState(false);
+  const [adminOpenError, setAdminOpenError] = useState('');
 
-  const loadProfile = async () => {
+  const openAdminWorkspace = async (event: MouseEvent<HTMLAnchorElement>) => {
+    event.preventDefault();
+    if (openingAdmin) return;
+    setOpeningAdmin(true);
+    setAdminOpenError('');
+
+    try {
+      const supabase = getSupabaseClient();
+      if (!supabase) throw new Error('Sign-in is temporarily unavailable. Please try again.');
+
+      // getUser checks the existing session and lets Supabase refresh it only
+      // when needed. Refreshing on every click can race another auth client.
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (userError || !userData.user) throw new Error('Your session has expired. Please sign in again.');
+
+      const establishAdminSession = async (accessToken: string) => fetch('/api/admin/session', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}` },
+        cache: 'no-store',
+      });
+
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session) throw new Error('Your session has expired. Please sign in again.');
+      let response = await establishAdminSession(sessionData.session.access_token);
+
+      // Retry a rejected token once with a newly refreshed session. Do not
+      // navigate until the server has actually issued the Admin cookie.
+      if (response.status === 401) {
+        const { data: refreshedData, error: refreshError } = await supabase.auth.refreshSession();
+        if (!refreshError && refreshedData.session) {
+          response = await establishAdminSession(refreshedData.session.access_token);
+        }
+      }
+
+      if (response.status === 403) throw new Error('This account is not authorized for the Admin workspace.');
+      if (!response.ok) throw new Error('We could not verify Admin access. Your account is still signed in. Please try again.');
+
+      router.push('/admin');
+    } catch (error) {
+      setAdminOpenError(error instanceof Error ? error.message : 'We could not open Admin. Please try again.');
+      setOpeningAdmin(false);
+    }
+  };
+
+  const loadProfile = useCallback(async () => {
     setLoading(true);
     setLoadError(false);
 
@@ -177,11 +223,12 @@ export default function DashboardPage() {
       setLoadError(true);
       setLoading(false);
     }
-  };
+  }, [router]);
 
   useEffect(() => {
-    void loadProfile();
-  }, []);
+    const loadTimer = window.setTimeout(() => void loadProfile(), 0);
+    return () => window.clearTimeout(loadTimer);
+  }, [loadProfile]);
 
   if (loading)
     return (
@@ -242,7 +289,7 @@ export default function DashboardPage() {
           <CreatorMobileNavigation
             currentPage="dashboard"
             additionalItems={[
-              ...(isAdmin ? [{ label: "Admin", href: "/admin" }] : []),
+              ...(isAdmin ? [{ label: "Admin", href: "/admin", onNavigate: openAdminWorkspace }] : []),
               { label: "Messages", href: "#next-steps" },
               { label: "Settings", href: "#account" },
             ]}
@@ -253,6 +300,8 @@ export default function DashboardPage() {
           />
         </div>
       </header>
+
+      {adminOpenError && <p role="alert" className="mx-auto mt-5 max-w-[1500px] rounded-xl border border-[#f0cfd2] bg-[#fff8f8] px-5 py-3 text-sm text-[#99404b]">{adminOpenError}</p>}
 
       <div className="mx-auto flex max-w-[1600px]">
         <aside className="hidden w-[230px] shrink-0 border-r border-[#e8e7eb] bg-white px-5 py-8 lg:block">
@@ -267,10 +316,12 @@ export default function DashboardPage() {
             {isAdmin && (
               <Link
                 href="/admin"
+                prefetch={false}
+                onClick={(event) => void openAdminWorkspace(event)}
                 className="flex items-center gap-3 rounded-xl px-4 py-3.5 text-sm font-medium text-[#6330dc] hover:bg-[#faf8ff]"
               >
                 <Icon name="shield" />
-                Admin
+                {openingAdmin ? 'Opening Admin…' : 'Admin'}
               </Link>
             )}
             <Link

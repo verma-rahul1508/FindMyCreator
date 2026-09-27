@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js';
 
 export const ADMIN_SESSION_COOKIE = 'cloutco-admin-session';
 
@@ -10,57 +10,54 @@ type ActiveAdmin = {
 
 type AdminAuthorization =
   | { state: 'unauthenticated' }
+  | { state: 'unavailable' }
   | { state: 'forbidden' }
   | { state: 'authorized'; email: string | null };
 
 /**
- * Checks the database-backed authorization record for the authenticated user
- * associated with the supplied server-side Supabase client.
- */
-export async function isCurrentUserAdmin(supabase: SupabaseClient): Promise<boolean> {
-  const { data: userData, error: userError } = await supabase.auth.getUser();
-
-  if (userError || !userData.user) {
-    return false;
-  }
-
-  const { data: isAdmin, error: adminError } = await supabase.rpc('is_admin');
-
-  return !adminError && isAdmin === true;
-}
-
-/**
- * Validates a Supabase access token server-side, then checks the active
- * database-backed admin authorization for that authenticated user.
+ * Validates a user-issued Supabase access token server-side, then checks the
+ * verified user's active database-backed administrator record through the
+ * existing security-definer is_admin() function.
  */
 export async function getAdminAuthorizationForAccessToken(accessToken: string): Promise<AdminAuthorization> {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabasePublishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
-  if (!supabaseUrl || !supabasePublishableKey) {
-    return { state: 'unauthenticated' };
+  if (!supabaseUrl || !publishableKey) {
+    return { state: 'unavailable' };
   }
 
-  const supabase = createClient(supabaseUrl, supabasePublishableKey, {
+  // The stateless server client must pass the user's token to PostgREST too.
+  // A direct service-role read of admin_users is not permitted by its grants.
+  const authClient = createClient(supabaseUrl, publishableKey, {
     auth: {
       persistSession: false,
       autoRefreshToken: false,
       detectSessionInUrl: false,
     },
     global: {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
+      headers: { Authorization: `Bearer ${accessToken}` },
     },
   });
 
-  const { data: userData, error: userError } = await supabase.auth.getUser(accessToken);
+  const { data: userData, error: userError } = await authClient.auth.getUser(accessToken);
 
   if (userError || !userData.user) {
-    return { state: 'unauthenticated' };
+    console.warn(`[admin-auth] Access token verification failed: ${userError?.name ?? 'no_user'}; status=${userError?.status ?? 'none'}; code=${userError?.code ?? 'none'}`);
+    return userError?.name === 'AuthRetryableFetchError' || userError?.status === 0
+      ? { state: 'unavailable' }
+      : { state: 'unauthenticated' };
   }
 
-  if (!(await isCurrentUserAdmin(supabase))) {
+  const { data: isAdmin, error: adminError } = await authClient.rpc('is_admin');
+  if (adminError) {
+    console.warn('[admin-auth] Admin lookup failed', {
+      code: adminError.code ?? null,
+      status: adminError.code === '42501' ? 403 : null,
+    });
+  }
+  if (adminError) return { state: 'unavailable' };
+  if (isAdmin !== true) {
     return { state: 'forbidden' };
   }
 

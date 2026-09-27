@@ -16,8 +16,14 @@ export default function BrandProposalPage() {
     const load = async () => {
       const supabase = getSupabaseClient({ detectSessionInUrl: false });
       if (!supabase || !proposalToken) { if (active) setState('missing'); return; }
-      const { data, error } = await supabase.rpc('get_brand_proposal', { p_proposal_token: proposalToken });
-      const next = error ? null : normalizeBrandProposal(data);
+      const [proposalResult, contentResult] = await Promise.all([
+        supabase.rpc('get_brand_proposal', { p_proposal_token: proposalToken }),
+        supabase.rpc('get_brand_proposal_content', { p_proposal_token: proposalToken }),
+      ]);
+      const next = proposalResult.error ? null : normalizeBrandProposal({
+        ...(proposalResult.data && typeof proposalResult.data === 'object' ? proposalResult.data : {}),
+        proposalContent: contentResult.error ? null : contentResult.data,
+      });
       if (!active) return;
       if (!next) setState('missing');
       else { setProposal(next); setState('loading'); }
