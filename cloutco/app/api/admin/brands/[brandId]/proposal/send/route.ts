@@ -5,11 +5,11 @@ import { NextResponse } from 'next/server';
 import { ADMIN_SESSION_COOKIE, getActiveAdminForAccessToken } from '@/lib/admin-auth';
 import { normalizeAdminBrandProposal } from '@/lib/brand-proposal-types';
 import { proposalEmail } from '@/lib/brand-proposal-email';
+import { isValidEmail, parseBrandEmailRecipients } from '@/lib/brand-email-recipients';
 
 export const runtime = 'nodejs';
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const privateHeaders = { 'Cache-Control': 'private, no-store' };
 
 function smtpConfig() {
@@ -17,7 +17,7 @@ function smtpConfig() {
   const port = Number(process.env.CONTACT_SMTP_PORT);
   const user = process.env.CONTACT_SMTP_USER?.trim();
   const password = process.env.CONTACT_SMTP_PASSWORD;
-  if (!host || !Number.isInteger(port) || port < 1 || port > 65_535 || !emailPattern.test(user || '') || !password) return null;
+  if (!host || !Number.isInteger(port) || port < 1 || port > 65_535 || !isValidEmail(user) || !password) return null;
   return { host, port, user, password };
 }
 
@@ -37,16 +37,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ bra
   });
   const { data, error: proposalError } = await supabase.rpc('admin_brand_proposal_detail', { p_brand_id: brandId });
   const proposal = proposalError ? null : normalizeAdminBrandProposal(data);
-  const recipientEmail = proposal?.recipientEmail?.trim() || '';
+  const recipients = parseBrandEmailRecipients(proposal?.recipientEmail);
   if (!proposal) return NextResponse.json({ error: 'We could not prepare this proposal.' }, { status: 500, headers: privateHeaders });
-  if (!emailPattern.test(recipientEmail)) return NextResponse.json({ error: 'Enter a valid Brand email before sending the proposal.' }, { status: 422, headers: privateHeaders });
+  if (!recipients.valid) return NextResponse.json({ error: 'Enter one or more valid Brand emails separated by semicolons before sending the proposal.' }, { status: 422, headers: privateHeaders });
 
   const contentResult = await supabase.rpc('get_brand_proposal_content', { p_proposal_token: proposal.proposalToken });
   const proposalUrl = `${new URL(request.url).origin}/proposal/${proposal.proposalToken}`;
   const mail = proposalEmail({ ...proposal, proposalContent: contentResult.error ? null : contentResult.data }, proposalUrl);
   try {
     const transporter = nodemailer.createTransport({ host: smtp.host, port: smtp.port, secure: smtp.port === 465, auth: { user: smtp.user, pass: smtp.password } });
-    await transporter.sendMail({ to: recipientEmail, from: `CloutCo <${smtp.user}>`, replyTo: 'connect@cloutco.in', subject: `Your CloutCo Creator Collaboration Proposal - ${proposal.brandName || 'Campaign'}`, text: mail.text, html: mail.html });
+    await transporter.sendMail({ to: recipients.recipients, from: `CloutCo <${smtp.user}>`, replyTo: 'connect@cloutco.in', subject: `Your CloutCo Creator Collaboration Proposal - ${proposal.brandName || 'Campaign'}`, text: mail.text, html: mail.html });
   } catch (error) {
     const smtpError = error as { code?: unknown; command?: unknown; responseCode?: unknown };
     console.error('Proposal email delivery failed.', {
